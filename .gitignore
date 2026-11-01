@@ -205,3 +205,12 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# internal specs and docs
+specs/
+docs/archive/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini

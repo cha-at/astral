@@ -1,0 +1,8 @@
+{
+  "views": {
+    "astral": {
+      "title": "Astral",
+      "description": "Read-only view of the shared workspace, SOUL and MEMORY"
+    }
+  }
+}

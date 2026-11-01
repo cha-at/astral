@@ -1,8 +1,7 @@
 """Tests for the Astral config layer (config.py).
 
-Covers AC-1.1 to AC-1.5 (shared root resolution and creation), AC-2.2/2.3
-(forbidden roots) and AC-8.1 (directory tree creation) from
-specs/001-shared-workspace/spec.md.
+Covers shared root resolution and creation, forbidden roots and directory
+tree creation.
 
 Every test passes an explicit ``data_path`` so nothing is ever written into
 the real AstrBot data directory.

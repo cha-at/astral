@@ -1,4 +1,4 @@
-"""Baseline coordinate checks for AstrBot 4.29.4 (001 FR-13).
+"""Baseline coordinate checks for AstrBot 4.29.4.
 
 These tests answer one question: are the four workspace resolvers still where
 the patch expects them, with the signatures the wrappers mimic, and do the
@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import ast
 import inspect
+import os
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -44,11 +45,22 @@ EXPECTED_CONSUMERS: dict[str, tuple[str, ...]] = {
 def _astrbot_source_root() -> Path | None:
     """Locate the AstrBot source tree used for the coordinate checks."""
     env = Path(__file__).resolve().parent.parent
-    candidates = [
-        Path("C:/Users/Chake/projects/AstrBot/AstrBot-code"),
-        env.parent / "AstrBot-code",
-        env.parent.parent / "AstrBot-code",
-    ]
+    candidates: list[Path] = []
+    override = os.environ.get("ASTRBOT_SOURCE")
+    if override:
+        candidates.append(Path(override))
+    try:
+        import astrbot
+
+        candidates.append(Path(astrbot.__file__).resolve().parent.parent)
+    except Exception:
+        pass
+    candidates.extend(
+        [
+            env.parent / "AstrBot-code",
+            env.parent.parent / "AstrBot-code",
+        ]
+    )
     for candidate in candidates:
         if (candidate / "astrbot" / "core" / "workspace.py").is_file():
             return candidate

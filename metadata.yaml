@@ -3,6 +3,6 @@ display_name: Astral
 desc: 一个工作区、一份记忆：把全平台所有会话的 Agent 工作区指向同一个共享根，并用 SOUL.md / MEMORY.md 承载文件式自我认知与长期记忆
 short_desc: 全平台共享工作区 + 文件式长期记忆，可观测、可回滚
 version: 0.1.0
-author: cha-at
+author: ChakerAt
 repo: https://github.com/cha-at/astral
-astrbot_version: ">=4.29,<5"
+astrbot_version: ">=4.29.4,<4.30"

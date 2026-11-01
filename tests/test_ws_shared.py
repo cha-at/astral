@@ -1,7 +1,7 @@
 """Tests for the shared-workspace patch core (ws_shared.py).
 
-Covers AC-3.1, AC-3.2, AC-3.4, AC-3.5, AC-3.6, AC-4.1, AC-4.3, AC-5.2,
-AC-5.3 and AC-6.1 from specs/001-shared-workspace/spec.md.
+Covers the resolver wrappers, double-write consumers, idempotent
+install/restore and the explicit failure modes.
 
 These tests patch the real astrbot.core.workspace module, so every test runs
 through fixtures that restore the baseline in teardown. Consumer modules are

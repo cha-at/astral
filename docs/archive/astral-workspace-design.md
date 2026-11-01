@@ -1,9 +1,9 @@
-> **状态：已归档（2026-11-01）**。本文已被 [`specs/`](../../specs/README.md) 取代，仅作为调研与设计过程记录保留。
+> **状态：已归档（2026-11-01）**。本文是早期设计稿，仅作为调研与设计过程记录保留；现行实现说明见 [`docs/dev-notes.md`](../dev-notes.md)。
 >
-> - 第 6 章「记忆功能设计」（SQLite + 作用域 + 自动抽取 + embedding）**已作废**，现行方案见 [`specs/002-soul-and-memory/`](../../specs/002-soul-and-memory/spec.md)。
-> - 附录 A 的源码坐标存在 4 处漂移（`workspace_type` 默认值表述、`converted_files` 用 md5 后 6 位、`star_manager.load` 实际区间、权限矩阵区间）；升级核对一律以 [`specs/001-shared-workspace/plan.md`](../../specs/001-shared-workspace/plan.md) §8 为准。
-> - 共享工作区补丁方案本身仍然有效，已扩展为 `specs/001-shared-workspace/`。
-> - 本文正文里的相对路径（`_investigation/…`、`AstrBot-code/…`）均相对**项目根**，即本文件向上三级（`../../../`）；插件仓库自身的规格见 `../../specs/`。
+> - 第 6 章「记忆功能设计」（SQLite + 作用域 + 自动抽取 + embedding）**已作废**，现行方案见 [README.md](../../README.md) 与 [`docs/dev-notes.md`](../dev-notes.md)。
+> - 附录 A 的源码坐标会随 AstrBot 升级漂移，升级核对以 `docs/dev-notes.md` 的「升级回归清单」为准。
+> - 共享工作区补丁方案本身仍然有效。
+> - 本文正文里的相对路径（`_investigation/…`、`AstrBot-code/…`）均相对**项目根**，这些材料不随仓库发布。
 
 ---
 # Astral · AstrBot 工作区改造与记忆功能 设计文档
@@ -11,7 +11,7 @@
 > 适用插件：astrbot_plugin_astral（展示名 Astral）
 > 目标 AstrBot：4.29.4（代码基线 AstrBot-code @ 831abae85）
 > 文档状态：v1 设计稿，供 Astral 开发使用
-> 依据：本仓库 _investigation/ 下的调研与 PoC（见附录 C）
+> 依据：维护者本地的 _investigation/ 调研与 PoC（见附录 C，未随仓库发布）
 
 ## 目录
 
@@ -930,7 +930,7 @@ consumers 为空 = 补丁没生效（典型原因：函数改名、AstrBot 大�
 
 ### P5 · 发布（1 天）
 
-- [ ] metadata.yaml：astrbot_version: ">=4.29,<5"、display_name、repo
+- [ ] metadata.yaml：astrbot_version: ">=4.29.4,<4.30"、display_name、repo
 - [ ] README：能力、限制（不能改内置 UI）、配置说明、升级注意事项
 - [ ] 升级回归：跑附录 A 的坐标核对 + 一个最小 harness
 - [ ] 版本号与 CHANGELOG

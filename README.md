@@ -6,9 +6,9 @@ Astral 是 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 的插件：在不�
 
 | 项 | 值 |
 | --- | --- |
-| 基线 | AstrBot 4.29.4（源码提交 `831abae85`），兼容版本范围 `>=4.29,<5` |
-| 运行环境 | Python 3.10+，Windows / macOS / Linux，单进程部署 |
-| 规格索引 | [specs/README.md](specs/README.md)（唯一权威）；原则见 [specs/CONSTITUTION.md](specs/CONSTITUTION.md) |
+| 基线 | AstrBot 4.29.4（源码提交 `831abae85`），兼容版本范围 `>=4.29.4,<4.30` |
+| 运行环境 | 随 AstrBot 4.29.4（Python 3.12+），Windows / macOS / Linux，单进程部署 |
+| 开发说明 | [docs/dev-notes.md](docs/dev-notes.md)（模块地图、契约与升级回归清单） |
 
 ## 目录
 
@@ -22,6 +22,7 @@ Astral 是 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 的插件：在不�
 - [升级与备份](#升级与备份)
 - [常见问题（FAQ）](#常见问题faq)
 - [开发与测试](#开发与测试)
+- [真实实例验收](#真实实例验收v010)
 - [许可](#许可)
 
 ## 能力与限制
@@ -41,6 +42,7 @@ Astral 是 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 的插件：在不�
 | --- | --- |
 | 不能修改内置 WebUI | Astral 不能给 AstrBot 内置 WebUI 加按钮、加标签页，也不能替换“工作区文件”面板；Astral 只有自己的插件页（WebUI → 插件 → Astral） |
 | 不改 AstrBot 源码 | 全部通过运行期 monkeypatch 包装工作区解析函数实现；插件目录之外的代码零改动，停用插件即还原 |
+| 安全影响（monkeypatch） | 接管 `resolve_project_workspace_root` 会让 AstrBot 针对 API-key 项目与 custom workspace 的越界校验不再生效；只在受信任的实例上使用，并绑定 4.29.x |
 | `computer_use_runtime=sandbox` 时工作区不参与 Agent 执行 | Agent 在容器内的 `/workspace` 里干活，与宿主机共享根无关；`/astral status` 会明确提示 |
 | 不支持多进程 / 多 worker 部署 | 补丁只在各自进程内生效；多 worker 下各进程各打各的补丁，行为无法保证 |
 | 升级 AstrBot 后需回归 | 源码坐标可能漂移；升级后必须重跑回归清单与测试，见[升级与备份](#升级与备份) |
@@ -49,7 +51,7 @@ Astral 是 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 的插件：在不�
 
 ## 安装与启用
 
-1. 在 AstrBot WebUI 的插件市场安装 `astrbot_plugin_astral`，或把插件目录放进 `data/plugins/`。
+1. 在 AstrBot WebUI → 插件 → 从仓库安装，填 `https://github.com/cha-at/astral`；或把插件目录放进 `data/plugins/`。插件市场上架后也可直接搜索 `astrbot_plugin_astral` 安装。
 2. 打开 WebUI → 插件 → Astral → 配置，按需修改 `shared_root` 等配置项。
 3. 重载插件（或在插件页启用）。插件会解析共享根、创建目录骨架、播种四份文件、同步托管区段并安装补丁。
 4. 在群里发 `/astral status`，确认安装状态为“已生效”、共享根路径正确、消费者数量非零。
@@ -63,7 +65,7 @@ Astral 是 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 的插件：在不�
 | --- | --- | --- | --- |
 | `shared_root` | 共享根目录 | 空字符串：落在 AstrBot 数据目录的 `workspaces/astral` | 支持 `~` 与相对路径（相对数据目录的 `workspaces`）；命中危险路径黑名单会拒绝安装，不会回落到默认目录 |
 | `patch_webchat_projects` | 是否同时接管 webchat 项目的工作区解析（Dashboard“工作区文件”面板） | `true` | 设为 `false` 后面板显示项目自己的目录、Agent 仍在共享根，两者不一致，`/astral status` 会明示 |
-| `forbidden_roots` | 额外禁止的共享根前缀 | 空列表 | 默认已禁止 AstrBot 源码、数据敏感区（`config`/`plugins`/`plugin_data`）、用户主目录敏感区与系统目录 |
+| `forbidden_roots` | 额外禁止的共享根前缀 | 空列表 | 默认已禁止 AstrBot 源码、数据敏感区（`config`/`plugins`/`plugin_data`）、用户主目录敏感区与系统目录；位于 `<data>` 子树内的默认根对“AstrBot 源码”规则例外（否则默认根会拒绝自己），但 `data/config`、`data/plugins`、`data/plugin_data` 仍单独禁止 |
 | `quota_gb` | 共享根体积告警阈值（GB） | `0`（不限制） | 超限只在 `/astral status` 与状态接口给 warn，**不自动删除**任何文件 |
 | `memory.enabled` | 是否在对话开始时注入记忆快照 | `true` | 关闭后不注入，播种与只读页不受影响 |
 | `memory.soul_budget_chars` | `SOUL.md` 的单次注入预算（字符） | `4000` | 超预算只截断快照，不改文件；完整内容用文件工具读取 |
@@ -77,7 +79,7 @@ Astral 是 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 的插件：在不�
 | 指令 | 作用 |
 | --- | --- |
 | `/astral status` | 查看共享根、补丁安装状态、消费者数量、运行时与失败原因；失败时显示“未生效”与原因，不会静默回落 |
-| `/astral clean [days]` | 把 `archive/` 之外修改时间早于 `days` 天的临时产物**移动**到 `archive/<yyyyMMdd-HHmmss>/`；省略 `days` 时默认为 `0`（把当前全部临时产物归档） |
+| `/astral clean [days]`（需要 AstrBot 管理员） | 把共享根**顶层**修改时间早于 `days` 天的普通文件**移动**到 `archive/<yyyyMMdd-HHmmss>/`；不递归，也不处理 `skills/`、`shared/`、`memory/`、`archive/`、`.astral/` 与四份内容文件；省略 `days` 时默认 `0` |
 | `/astral memory show` | 查看记忆文件：默认 `memory`；私聊返回全文（超过 3000 字符截断并给出路径）；群聊只返回文件名、字符数、更新时间与前 3 行，完整内容请私聊或到 WebUI 只读页 |
 
 `/astral memory show` 的完整语法是 `/astral memory show [soul|memory|agents|extra]`，四个参数分别对应 `SOUL.md`、`MEMORY.md`、`AGENTS.md`、`EXTRA_PROMPT.md`，大小写不敏感。
@@ -93,8 +95,8 @@ Astral 是 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 的插件：在不�
 | 方法 | 路径 | 成功（200） | 失败语义 |
 | --- | --- | --- | --- |
 | GET | `/api/v1/plugins/extensions/astrbot_plugin_astral/state` | 返回 `installed`、`shared_root`、`baseline`、`runtime`、`consumers`、`disk`、`quota`、`memory`、`warnings`、`reason` | 503：插件已停用或补丁未安装，body 仍含 `installed=false` 与 `reason` |
-| GET | `/api/v1/plugins/extensions/astrbot_plugin_astral/files` | 不带 `name` 返回清单（`shared_root`、`memory_soft_limit`、四个文件的字符数/更新时间/`managed_ok`、归档索引）；带 `?name=SOUL` 返回单文件正文与 `truncated` 标记（可选 `MEMORY`、`AGENTS`、`EXTRA`，大小写不敏感） | 400 `unknown_name`（名称不在白名单或含 `../` 等注入尝试）；404 `not_found`；500 `read_failed`；503 插件未安装 |
-| POST | `/api/v1/plugins/extensions/astrbot_plugin_astral/clean` | 归档完成，返回本次归档的时间戳目录 | 400 参数非法；503 插件未安装 |
+| GET | `/api/v1/plugins/extensions/astrbot_plugin_astral/files` | 不带 `name` 返回清单（`shared_root`、`memory_soft_limit`、四个文件的字符数/更新时间/`managed_ok`、归档索引）；带 `?name=SOUL` 返回单文件正文与 `truncated` 标记（可选 `MEMORY`、`AGENTS`、`EXTRA`，大小写不敏感） | 400 `unknown_name`（名称不在白名单或含 `../` 等注入尝试）、400 `forbidden_path`（解析后越出共享根）；404 `not_found`；500 `read_failed`；503 插件未安装 |
+| POST | `/api/v1/plugins/extensions/astrbot_plugin_astral/clean` | 归档完成，返回本次归档的时间戳目录与 `days` | 非法 `days` 按 `0` 处理并返回 200；503 插件未安装 |
 
 约束：`files` 只注册 GET，不提供 PUT/POST/DELETE；单文件响应最多 512 KB，超出时截断并标 `truncated=true`；不返回目录树、不返回归档正文，错误响应不回传异常栈。
 
@@ -127,7 +129,7 @@ Astral 是 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 的插件：在不�
 
 ## 升级与备份
 
-**需要单独备份共享根。** AstrBot 官方的“维护 → 备份”只包含会话别名、用量、密钥与 MCP 配置，**不含工作区文件**；只做官方备份会丢掉全部工作区与记忆。
+**需要单独备份共享根。** AstrBot 官方的“维护 → 备份”覆盖配置、插件与数据库等数据，但**不包含共享根里的工作区文件**；只做官方备份会丢掉全部工作区与记忆。
 
 PowerShell 备份（把共享根整目录复制到备份盘）：
 
@@ -142,13 +144,13 @@ PowerShell 恢复（先停用插件，避免恢复过程中被写入）：
 Copy-Item -Recurse -Force "D:\backup\astral-20261101\*" "C:\AstrBot\data\workspaces\astral"
 ~~~
 
-迁移到新机器：先在新机器配置好 `shared_root`，重启让插件建好目录骨架，再把备份内容拷回共享根并重启。对话快照是进程内内存态，重启后按文件重建；已有对话不会自动换新快照，需要 `/new`。
+迁移到新机器：先在新机器配置好 `shared_root`，重启让插件建好目录骨架，再把备份内容拷回共享根并重启。对话快照是进程内内存态：同一进程内冻结，改文件后要 `/new` 才刷新；重启或重载插件后缓存清空，已有对话下一轮会按当前文件重建一次。
 
 升级 AstrBot 之后：
 
 1. 重载插件，发 `/astral status`，确认安装状态为“已生效”、共享根正确、消费者数量非零；
 2. 跑 `pytest tests/`（命令见[开发与测试](#开发与测试)），确认补丁、配置、快照与页面契约用例全部通过；
-3. 按 [specs/001-shared-workspace/plan.md](specs/001-shared-workspace/plan.md) §9 的清单核对源码坐标：4 个解析函数是否存在、3 个消费者的 import 形态、注入钩子的位置是否仍在 core 组装之后；
+3. 按 [docs/dev-notes.md](docs/dev-notes.md) 的“升级回归清单”核对源码坐标：4 个解析函数是否存在、3 个消费者的 import 形态、注入钩子的位置是否仍在 core 组装之后；
 4. 行为不符时停用插件即回滚到原生行为；记忆内容用备份恢复。
 
 ## 常见问题（FAQ）
@@ -159,7 +161,7 @@ Copy-Item -Recurse -Force "D:\backup\astral-20261101\*" "C:\AstrBot\data\workspa
 | `/reset` 能刷新快照吗？ | 不能。`/reset` 只清空对话历史、不换对话 ID（cid），快照仍然复用；要换新快照请用 `/new`。 |
 | 群聊里 `/astral memory show` 为什么只有几行？ | 群聊只给元信息与前 3 行（隐私要求），完整内容请私聊机器人或在 WebUI 只读页查看。 |
 | 第三方 agent runner 能用吗？ | 未验证。快照追加在 `system_prompt` 末尾，依赖 core 采纳该字段；第三方 runner（`agent_runner.runner_type`）下是否生效没有测试，按“未知 / 未支持”对待。 |
-| 插件停用后页面和指令还能用吗？ | 不能。端点自检返回 503、指令消失；但 `EXTRA_PROMPT.md` 仍在磁盘上，AstrBot core 仍会注入它，表现为“守则在、快照没了”。 |
+| 插件停用后页面和指令还能用吗？ | 不能。端点自检返回 503、指令消失；共享根里的 `EXTRA_PROMPT.md` 仍在磁盘上，但补丁还原后 core 回到每会话工作区查找它，守则不再注入（v0.1.0 代码路径如此）。 |
 | 可以跑多进程 / 多 worker 吗？ | 不支持。补丁只在各自进程内生效，多 worker 下行为不确定。 |
 | 沙箱运行时下工作区在哪？ | `computer_use_runtime=sandbox` 时 Agent 在容器内的 `/workspace` 干活，不参与共享根；`/astral status` 会给出提示。 |
 | 共享根磁盘只涨不跌怎么办？ | 定期用 `/astral clean` 归档临时产物（移动而非删除）；`quota_gb` 只告警不删除，需要你自己清理或扩容。 |
@@ -195,10 +197,6 @@ Set-Location "C:\AstrBot\data\plugins\astrbot_plugin_astral"
 | `tests/test_plugin_load.py` | 以 `data.plugins.<插件名>.main` 包路径导入并检查指令/钩子注册 |
 | `tests/test_smoke_env.py` | 测试环境自检（AstrBot 可导入、4 个解析函数存在） |
 
-## 许可
-
-[GNU Affero General Public License v3.0](LICENSE)。
-
 ## 真实实例验收（v0.1.0）
 
 以下结果在 AstrBot 4.29.4 实例上实测（2026-11-01）：
@@ -207,6 +205,12 @@ Set-Location "C:\AstrBot\data\plugins\astrbot_plugin_astral"
 - `GET /api/v1/plugins/extensions/astrbot_plugin_astral/state` → 200，`installed=true`；`consumers.resolve_workspace_root_for_umo` 含 `astrbot.core.astr_main_agent`、`astrbot.core.tools.computer_tools.util`，`consumers.resolve_project_workspace_root` 含 `astrbot.dashboard.services.chatui_project_service`。
 - `GET /api/v1/plugins/extensions/astrbot_plugin_astral/files` → 200；`?name=SOUL` → 200 且含 `content`；`?name=../../etc/passwd` → 400 `unknown_name`。
 - 停用插件后 `state` → 503 且 `installed=false`；重新启用 → 200 且 `installed=true`。
-- 全量 `pytest tests -q` = 150 passed / 2 skipped（跳过项为 Windows 无符号链接权限）。
+- 全量 `pytest tests -q` = 152 passed / 2 skipped（Windows 无符号链接权限）。
 
 完整验收记录见 [CHANGELOG.md](CHANGELOG.md)。
+
+## 许可
+
+[GNU Affero General Public License v3.0](LICENSE)。Copyright (C) 2026 ChakerAt。
+
+`Astral` 仅作为本插件展示名；本项目与 Astral Software Inc.（Ruff / uv）无关，也未发布同名 Python 包。

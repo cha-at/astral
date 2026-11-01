@@ -1,8 +1,7 @@
 """Tests for the Astral metadata store (store.py).
 
-Covers AC-11.1 (archive by moving), AC-11.2 (append-only JSONL audit) and
-AC-11.3 (quota warns without deleting) from
-specs/001-shared-workspace/spec.md, plus the E-9 robustness case.
+Covers archive by moving, append-only JSONL audit and quota warnings
+without deleting, plus the robustness case.
 """
 
 from __future__ import annotations

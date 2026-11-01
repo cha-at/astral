@@ -1,6 +1,6 @@
 # 开发说明（模块地图、契约与验证记录）
 
-> 规格是唯一权威：`specs/`。本文只记录「代码在哪、怎么测、验收过什么」，供后续维护者与 agent 使用。README 面向用户，本文件面向实现者。
+> 本文记录「代码在哪、怎么测、验收过什么」，供维护者与 agent 使用。README 面向用户，本文件面向实现者。设计规格与调研材料不随仓库发布。
 
 ## 1. 模块地图
 
@@ -77,7 +77,7 @@ $env:ASTRBOT_ROOT = "$env:TEMP\astral-testroot"
 | `test_coordinates.py` | 4 个函数签名、3 个消费者仍为顶层 import、桩版本漂移检测 |
 | `test_views_contract.py` | 只读页静态契约与 README/CHANGELOG 必含内容 |
 
-当前基线：`pytest tests -q` → 151 passed / 2 skipped（跳过项是 Windows 无 symlink 权限的两个符号链接用例）。
+当前基线：`pytest tests -q` → 152 passed / 2 skipped（2 个符号链接用例在 Windows 上跳过）。
 
 ## 4. 真实实例验收（AstrBot 4.29.4 @ `831abae85`）
 
@@ -90,13 +90,23 @@ $env:ASTRBOT_ROOT = "$env:TEMP\astral-testroot"
 - 插件页：`/api/v1/plugins/astrbot_plugin_astral/views/astral` 的 `content_path` 返回 200（约 27 KB），含 bridge 注入与「全局共享」横幅，无 `innerHTML`/`<textarea>`/`contenteditable`。
 - 首次部署时把 `shared_root` 指到实例源码目录会导致安装失败并给出 `forbidden` 原因（fail-loud 生效）；该测试同时暴露并修复了「默认根位于 AstrBot 安装目录内被误判」的问题。
 
-**harness（T-0 / G-8）**：在非沙箱环境完整运行 `../_investigation/poc/harness/harness.py` → **73 passed / 0 failed**（2026-11-01），输出存于 `../_investigation/verify/harness-2026-11-01.txt`。
+**验证脚本**：另有 73 条验证脚本断言在非沙箱环境通过（2026-11-01）；脚本与输出未随仓库发布。
 
-**尚未自动化的验收**（需要真实多平台会话或人工观察）：三平台 `pwd` 一致（AC-3.3）、Dashboard 面板路径（AC-9.1/9.2）、persona 与边界冲突（AC-1.2）、让 bot 写记忆与去标识化（AC-4.2/AC-7.2）、备份恢复与迁移（AC-8.1/8.2）。
+**尚未自动化的验收**（需要真实多平台会话或人工观察）：三平台 `pwd` 一致、WebUI 面板路径、persona 与边界冲突、让 bot 写记忆与去标识化、备份恢复与迁移。
 
 ## 5. 已知限制与后续
 
-- 补丁依赖 AstrBot 4.29.x 的解析入口；升级后按 `specs/001-shared-workspace/plan.md` §9 回归，漂移时 `state.reason` 会显示缺失函数名。
-- 叶子兜底（`default_workspace_root` / `project_workspace_root`）不覆盖三处「本地重算」路径（001 ADR-3 / E-1）。
-- 快照只在 `/new` 后刷新；`/reset` 不换 cid。
-- `views/astral/_page.json` 在 4.29.4 不被页面服务消费（服务只扫 `index.html`），保留为元数据。
+- 补丁依赖 AstrBot 4.29.x 的解析入口；升级后按下面的「升级回归清单」核对，漂移时 `state.reason` 会显示缺失函数名。
+- 叶子兜底（`default_workspace_root` / `project_workspace_root`）不覆盖三处「本地重算」路径。
+- 同一进程内快照冻结，改文件后要 `/new`；`/reset` 不换 cid；重启或重载插件后按当前文件重建。
+- 页面标题/描述在 `.astrbot-plugin/i18n/*.json` 的 `views.astral`；AstrBot 4.29.4 通过 i18n 读取。
+
+### 升级回归清单
+
+AstrBot 升级后：
+
+1. `pytest tests -q` 全量通过；
+2. `status()` 的 `consumers` 非空，且包含 `astr_main_agent`、`computer_tools/util`、`chatui_project_service`；
+3. `tests/test_coordinates.py` 通过（四个解析函数存在且签名一致）；
+4. `on_llm_request` 注入仍生效，快照出现在 system prompt 末尾；
+5. 漂移时 `state.reason` 显示缺失函数名，停用插件即回滚。
