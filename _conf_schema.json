@@ -1,0 +1,57 @@
+{
+  "shared_root": {
+    "type": "string",
+    "description": "共享工作区根目录",
+    "hint": "留空 = <AstrBot data>/workspaces/astral；支持 ~ 展开与相对路径（相对 <data>/workspaces）。绝对路径原样使用。目录不存在会自动创建，创建失败视为安装失败。",
+    "default": ""
+  },
+  "patch_webchat_projects": {
+    "type": "bool",
+    "description": "同时接管 webchat 项目工作区解析（Dashboard 文件面板）",
+    "hint": "关闭后 Agent 仍在共享根，但 Dashboard 面板会显示项目自己的目录，容易误解。/astral status 会明确提示两者不一致。建议保持开启。",
+    "default": true
+  },
+  "forbidden_roots": {
+    "type": "list",
+    "description": "额外禁止的共享根前缀（安全护栏）",
+    "hint": "默认已包含 AstrBot 源码、data/config、data/plugins、data/plugin_data、用户主目录敏感区与系统目录。命中任一规则时插件拒绝安装补丁并报错，不会回落到默认目录。相对路径以 <data>/workspaces 为基准。",
+    "default": []
+  },
+  "quota_gb": {
+    "type": "float",
+    "description": "共享根体积告警阈值（GB，0 = 不限制）",
+    "hint": "超限只在 /astral status 与 GET /astrbot_plugin_astral/state 里告警，不删除任何文件。",
+    "default": 0
+  },
+  "memory": {
+    "type": "object",
+    "description": "记忆与快照（SOUL.md / MEMORY.md）",
+    "hint": "记忆的唯一载体是共享根下的 Markdown 文件，这里只控制注入预算与容量阈值。改完重载插件生效。",
+    "items": {
+      "enabled": {
+        "type": "bool",
+        "description": "启用对话级记忆快照注入",
+        "hint": "关闭后不再向 system_prompt 追加 [Astral Memory Snapshot]，但首启播种、只读页与 /astral memory show 仍可用。",
+        "default": true
+      },
+      "soul_budget_chars": {
+        "type": "int",
+        "description": "SOUL.md 注入预算（字符）",
+        "hint": "超出预算只截断快照，不改文件。默认 4000。",
+        "default": 4000
+      },
+      "memory_budget_chars": {
+        "type": "int",
+        "description": "MEMORY.md 注入预算（字符）",
+        "hint": "超出预算只截断快照，不改文件；截断提示里会给绝对路径。默认 8000。",
+        "default": 8000
+      },
+      "soft_limit_chars": {
+        "type": "int",
+        "description": "MEMORY.md 容量软上限（字符，只提示不删除）",
+        "hint": "超过后快照尾部出现容量提示，建议合并或把历史条目剪到 memory/archive/MEMORY-YYYYMM.md。默认 20000。",
+        "default": 20000
+      }
+    }
+  }
+}

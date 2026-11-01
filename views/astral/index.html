@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Astral · 共享工作区</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    color-scheme: light;
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --text: #1f2329;
+    --muted: #5c6470;
+    --border: #dfe3e8;
+    --accent: #3568d4;
+    --ok: #1b7a3d;
+    --warn: #8a5a00;
+    --danger: #b3261e;
+    --danger-bg: #fdecea;
+    --notice-bg: #fff7e0;
+    --notice-border: #e6c26a;
+    --bar-bg: #e6e9ee;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #14161a;
+      --surface: #1c1f25;
+      --text: #e7e9ec;
+      --muted: #9aa3ad;
+      --border: #2c3138;
+      --accent: #7a9bff;
+      --ok: #5fce8a;
+      --warn: #e5b567;
+      --danger: #ff8a80;
+      --danger-bg: #3a1d1c;
+      --notice-bg: #322810;
+      --notice-border: #8a6a1f;
+      --bar-bg: #2a2f37;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #14161a;
+    --surface: #1c1f25;
+    --text: #e7e9ec;
+    --muted: #9aa3ad;
+    --border: #2c3138;
+    --accent: #7a9bff;
+    --ok: #5fce8a;
+    --warn: #e5b567;
+    --danger: #ff8a80;
+    --danger-bg: #3a1d1c;
+    --notice-bg: #322810;
+    --notice-border: #8a6a1f;
+    --bar-bg: #2a2f37;
+  }
+
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .wrap { width: 100%; max-width: 960px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  h2 { font-size: 15px; margin: 20px 0 8px; }
+  h3 { font-size: 15px; margin: 0 0 2px; font-family: var(--mono); }
+  p { margin: 6px 0; }
+  code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--bar-bg);
+    padding: 1px 4px;
+    border-radius: 4px;
+    overflow-wrap: anywhere;
+  }
+
+  .banner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    align-items: baseline;
+    padding: 12px 14px;
+    border: 1px solid var(--notice-border);
+    background: var(--notice-bg);
+    border-radius: 10px;
+  }
+  .banner strong { font-size: 15px; }
+  .banner span { overflow-wrap: anywhere; }
+
+  .notice {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--notice-border);
+    background: var(--notice-bg);
+    overflow-wrap: anywhere;
+  }
+  .errorbar {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--danger);
+    background: var(--danger-bg);
+    color: var(--danger);
+    overflow-wrap: anywhere;
+  }
+
+  .section { margin-top: 16px; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+
+  .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 16px; margin: 0; }
+  .kv div { min-width: 0; }
+  .kv dt { color: var(--muted); font-size: 12px; }
+  .kv dd { margin: 0; overflow-wrap: anywhere; }
+  .mono { font-family: var(--mono); font-size: 12px; }
+
+  .badge {
+    display: inline-block;
+    padding: 0 8px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    font-size: 12px;
+    line-height: 20px;
+  }
+  .badge.ok { color: var(--ok); }
+  .badge.bad { color: var(--danger); }
+  .badge.warn { color: var(--warn); }
+
+  .reason {
+    margin: 10px 0 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--danger-bg);
+    color: var(--danger);
+    overflow-wrap: anywhere;
+  }
+
+  .warnings {
+    margin: 8px 0 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--notice-border);
+    background: var(--notice-bg);
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .file-card {
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    cursor: pointer;
+  }
+  .file-card:hover { border-color: var(--accent); }
+  .file-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .file-card[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .file-card.missing { opacity: 0.75; }
+  .file-subtitle { margin: 0; color: var(--muted); font-size: 12px; }
+  .file-meta { margin: 6px 0 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+
+  .bar { height: 10px; border-radius: 999px; background: var(--bar-bg); overflow: hidden; }
+  .fill { height: 100%; width: 0; background: var(--accent); transition: width 0.2s ease; }
+  .fill.over { background: var(--danger); }
+  .mem-text { color: var(--muted); overflow-wrap: anywhere; }
+  .mem-text.over { color: var(--danger); }
+  .archive-text { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+
+  .preview-meta { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+  pre {
+    max-width: 100%;
+    max-height: 420px;
+    overflow: auto;
+    margin: 8px 0 0;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.55;
+    white-space: pre;
+    tab-size: 2;
+  }
+
+  footer {
+    margin-top: 20px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+  }
+  footer p { margin: 6px 0; overflow-wrap: anywhere; }
+
+  @media (max-width: 380px) {
+    .wrap { padding: 12px; }
+    .cards { grid-template-columns: 1fr; }
+    .kv { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Astral · 共享工作区</h1>
+
+  <div class="banner">
+    <strong>全局共享</strong>
+    <span>所有平台、所有群、所有私聊共用同一个工作区与同一份记忆；不要写入密钥、口令或第三方隐私。</span>
+  </div>
+
+  <div id="notice" class="notice" hidden>请在 AstrBot WebUI 的插件页中打开：本页依赖插件页通信组件才能读取状态与文件。</div>
+  <div id="error" class="errorbar" role="alert" hidden></div>
+
+  <section class="section" aria-labelledby="status-title">
+    <h2 id="status-title">补丁状态</h2>
+    <div class="panel">
+      <dl class="kv">
+        <div><dt>安装状态</dt><dd><span id="st-installed" class="badge warn">加载中…</span></dd></div>
+        <div><dt>共享根</dt><dd id="st-root" class="mono">—</dd></div>
+        <div><dt>托管区段</dt><dd id="st-managed">—</dd></div>
+        <div><dt>消费者</dt><dd id="st-consumers">—</dd></div>
+        <div><dt>运行时</dt><dd id="st-runtime">—</dd></div>
+        <div><dt>基线</dt><dd id="st-baseline">—</dd></div>
+        <div><dt>磁盘</dt><dd id="st-disk">—</dd></div>
+        <div><dt>配额</dt><dd id="st-quota">—</dd></div>
+      </dl>
+      <p id="st-reason" class="reason" hidden></p>
+      <p id="st-warnings" class="warnings" hidden></p>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="files-title">
+    <h2 id="files-title">四个文件</h2>
+    <div id="cards" class="cards"></div>
+  </section>
+
+  <section class="section" aria-labelledby="memory-title">
+    <h2 id="memory-title">MEMORY.md 容量</h2>
+    <div class="panel">
+      <div class="bar" role="img" aria-label="MEMORY.md 容量占软上限的比例"><div id="mem-fill" class="fill"></div></div>
+      <p id="mem-text" class="mem-text">加载中…</p>
+      <p id="archive-text" class="archive-text">—</p>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="preview-title">
+    <h2 id="preview-title">只读预览</h2>
+    <p id="preview-meta" class="preview-meta">加载中…</p>
+    <pre id="preview" tabindex="0">加载中…</pre>
+  </section>
+
+  <footer>
+    <p><strong>托管区段</strong>：EXTRA_PROMPT.md 中 <code>astral:managed:begin</code> 与 <code>astral:managed:end</code> 之间的内容由 Astral 在每次插件加载时重写，标记之外的内容属于你。</p>
+    <p><strong>备份</strong>：请整目录拷贝共享根（例如 PowerShell 的 <code>Copy-Item -Recurse</code>）；AstrBot 官方备份不包含工作区文件。</p>
+    <p><strong>只读</strong>：本页不能修改任何文件；修改请直接用文件工具编辑共享根下的文件。</p>
+  </footer>
+</div>
+<script src="/api/plugin/page/bridge-sdk.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var bridge = window.AstrBotPluginView || window.AstrBotPluginPage || null;
+
+  var FILE_ORDER = ["SOUL", "MEMORY", "AGENTS", "EXTRA"];
+  var FILE_LABELS = {
+    SOUL: "SOUL.md",
+    MEMORY: "MEMORY.md",
+    AGENTS: "AGENTS.md",
+    EXTRA: "EXTRA_PROMPT.md"
+  };
+  var FILE_ROLES = {
+    SOUL: "身份与边界（每对话注入）",
+    MEMORY: "长期记忆（每对话注入）",
+    AGENTS: "工作区说明（不注入对话）",
+    EXTRA: "注入守则（Astral 重写托管区段）"
+  };
+  var DEFAULT_SOFT_LIMIT = 20000;
+  var REQUEST_TIMEOUT_MS = 15000;
+  var CONTEXT_TIMEOUT_MS = 5000;
+
+  var errorList = [];
+  var selectedName = "";
+  var softLimit = DEFAULT_SOFT_LIMIT;
+  var stateRoot = "";
+  var filesRoot = "";
+  var stateManaged = "";
+  var filesManaged = null;
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  function setText(id, value) {
+    var node = byId(id);
+    if (node) {
+      node.textContent = value;
+    }
+  }
+
+  function describeError(error) {
+    if (error && typeof error.message === "string" && error.message) {
+      return error.message;
+    }
+    if (typeof error === "string" && error) {
+      return error;
+    }
+    return "未知错误";
+  }
+
+  function addError(message) {
+    if (!message) {
+      return;
+    }
+    if (errorList.indexOf(message) === -1) {
+      errorList.push(message);
+    }
+    var bar = byId("error");
+    if (bar) {
+      bar.textContent = errorList.join("；");
+      bar.hidden = false;
+    }
+  }
+
+  function showNotice(message) {
+    var box = byId("notice");
+    if (!box) {
+      return;
+    }
+    box.textContent = message;
+    box.hidden = false;
+  }
+
+  function pad2(value) {
+    return value < 10 ? "0" + value : String(value);
+  }
+
+  function formatTime(value) {
+    if (!value) {
+      return "时间未知";
+    }
+    var date = new Date(value);
+    if (isNaN(date.getTime())) {
+      return String(value);
+    }
+    return date.getFullYear() + "-" + pad2(date.getMonth() + 1) + "-" + pad2(date.getDate()) +
+      " " + pad2(date.getHours()) + ":" + pad2(date.getMinutes()) + ":" + pad2(date.getSeconds());
+  }
+
+  function formatChars(value) {
+    if (typeof value !== "number" || !isFinite(value)) {
+      return "—";
+    }
+    return value.toLocaleString("zh-CN") + " 字符";
+  }
+
+  function formatPercent(value) {
+    if (typeof value !== "number" || !isFinite(value)) {
+      return "—";
+    }
+    return Math.round(value) + "%";
+  }
+
+  function withTimeout(request, label) {
+    return new Promise(function (resolve, reject) {
+      var timer = window.setTimeout(function () {
+        reject(new Error(label + "请求超时（" + Math.round(REQUEST_TIMEOUT_MS / 1000) + " 秒）"));
+      }, REQUEST_TIMEOUT_MS);
+      request.then(function (value) {
+        window.clearTimeout(timer);
+        resolve(value);
+      }, function (error) {
+        window.clearTimeout(timer);
+        reject(error);
+      });
+    });
+  }
+
+  function ensureRequest(request, label) {
+    if (!request || typeof request.then !== "function") {
+      return Promise.reject(new Error("插件页通信组件没有返回有效响应"));
+    }
+    return withTimeout(request, label);
+  }
+
+  function requestState() {
+    try {
+      return ensureRequest(bridge.apiGet("state"), "状态接口");
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
+
+  function requestFileList() {
+    try {
+      return ensureRequest(bridge.apiGet("files"), "文件清单接口");
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
+
+  function requestFile(name) {
+    try {
+      return ensureRequest(bridge.apiGet("files", { name: name }), "文件接口");
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
+
+  function renderRoot() {
+    var root = stateRoot || filesRoot;
+    setText("st-root", root || "未知");
+  }
+
+  function setBadge(label, kind) {
+    var badge = byId("st-installed");
+    if (!badge) {
+      return;
+    }
+    badge.textContent = label;
+    badge.className = "badge " + kind;
+  }
+
+  function applyMemoryLimit(value) {
+    if (typeof value === "number" && isFinite(value) && value > 0) {
+      softLimit = value;
+    }
+  }
+
+  function applyState(data) {
+    if (!data || typeof data !== "object") {
+      setBadge("状态未知", "warn");
+      addError("状态接口返回了无法识别的数据。");
+      return;
+    }
+
+    if (data.installed === true) {
+      setBadge("已生效", "ok");
+    } else if (data.installed === false) {
+      setBadge("未生效", "bad");
+    } else {
+      setBadge("状态未知", "warn");
+    }
+
+    if (typeof data.shared_root === "string" && data.shared_root) {
+      stateRoot = data.shared_root;
+    }
+    renderRoot();
+
+    var runtime = typeof data.runtime === "string" && data.runtime ? data.runtime : "未知";
+    setText("st-runtime", runtime === "sandbox" ? "sandbox（工作区不参与 Agent 执行）" : runtime);
+
+    var baseline = data.baseline && typeof data.baseline === "object" ? data.baseline : null;
+    if (baseline && baseline.astrbot) {
+      var commit = baseline.commit ? "（" + String(baseline.commit).slice(0, 8) + "）" : "";
+      setText("st-baseline", "AstrBot " + baseline.astrbot + commit);
+    } else {
+      setText("st-baseline", "未知");
+    }
+
+    var disk = data.disk && typeof data.disk === "object" ? data.disk : null;
+    if (disk) {
+      var diskParts = [];
+      diskParts.push(disk.exists === false ? "共享根不存在" : "共享根存在");
+      if (typeof disk.files === "number") {
+        diskParts.push(disk.files + " 个文件");
+      }
+      if (typeof disk.size_mb === "number") {
+        diskParts.push(disk.size_mb + " MB");
+      }
+      setText("st-disk", diskParts.join("，"));
+    } else {
+      setText("st-disk", "未知");
+    }
+
+    var quota = data.quota && typeof data.quota === "object" ? data.quota : null;
+    if (quota && typeof quota.limit_gb === "number" && quota.limit_gb > 0) {
+      var quotaState = quota.warn === true ? "已超限告警" : "未超限";
+      setText("st-quota", quotaState + "（上限 " + quota.limit_gb + " GB，只告警不删除）");
+    } else {
+      setText("st-quota", "不限制");
+    }
+
+    var consumers = data.consumers && typeof data.consumers === "object" ? data.consumers : null;
+    if (consumers) {
+      var functionNames = Object.keys(consumers);
+      var moduleCount = 0;
+      functionNames.forEach(function (name) {
+        var modules = consumers[name];
+        if (Array.isArray(modules)) {
+          moduleCount += modules.length;
+        }
+      });
+      setText("st-consumers", functionNames.length + " 个函数 / " + moduleCount + " 个模块");
+    } else {
+      setText("st-consumers", "未知");
+    }
+
+    if (data.memory && typeof data.memory === "object") {
+      applyMemoryLimit(data.memory.soft_limit_chars);
+      if (typeof data.memory.managed === "string") {
+        stateManaged = data.memory.managed;
+      }
+      renderManaged();
+    }
+
+    var warnings = Array.isArray(data.warnings) ? data.warnings : [];
+    var warningsNode = byId("st-warnings");
+    if (warningsNode) {
+      var warningText = warnings.filter(function (item) {
+        return typeof item === "string" && item;
+      }).join("；");
+      if (warningText) {
+        warningsNode.textContent = "告警：" + warningText;
+        warningsNode.hidden = false;
+      } else {
+        warningsNode.textContent = "";
+        warningsNode.hidden = true;
+      }
+    }
+
+    var reasonNode = byId("st-reason");
+    if (reasonNode) {
+      if (typeof data.reason === "string" && data.reason) {
+        reasonNode.textContent = "失败原因：" + data.reason;
+        reasonNode.hidden = false;
+      } else if (data.installed === false) {
+        reasonNode.textContent = "补丁未安装，但状态接口没有提供原因。";
+        reasonNode.hidden = false;
+      } else {
+        reasonNode.textContent = "";
+        reasonNode.hidden = true;
+      }
+    }
+  }
+
+  function applyStateError(error) {
+    setBadge("状态未知", "warn");
+    var message = describeError(error);
+    if (message.indexOf("503") !== -1) {
+      addError("状态接口返回 503：插件已停用或补丁未安装（" + message + "）。");
+      return;
+    }
+    addError("读取补丁状态失败：" + message + "。");
+  }
+
+  function findEntry(files, name) {
+    var found = null;
+    files.forEach(function (entry) {
+      if (entry && typeof entry.name === "string" && entry.name.toUpperCase() === name) {
+        found = entry;
+      }
+    });
+    return found;
+  }
+
+  function buildCard(name, entry) {
+    var card = document.createElement("div");
+    card.className = "file-card";
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-pressed", "false");
+    card.setAttribute("data-file", name);
+
+    var title = document.createElement("h3");
+    title.textContent = FILE_LABELS[name];
+
+    var role = document.createElement("p");
+    role.className = "file-subtitle";
+    role.textContent = FILE_ROLES[name];
+
+    var meta = document.createElement("p");
+    meta.className = "file-meta";
+    if (entry && entry.exists) {
+      meta.textContent = formatChars(entry.chars) + " · " + formatTime(entry.mtime);
+    } else {
+      meta.textContent = "未创建，插件加载时会播种";
+      card.className = card.className + " missing";
+    }
+
+    card.appendChild(title);
+    card.appendChild(role);
+    card.appendChild(meta);
+    card.addEventListener("click", function () {
+      selectFile(name);
+    });
+    card.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+        event.preventDefault();
+        selectFile(name);
+      }
+    });
+    return card;
+  }
+
+  function markSelected(name) {
+    var cards = document.querySelectorAll(".file-card");
+    for (var index = 0; index < cards.length; index += 1) {
+      var card = cards[index];
+      card.setAttribute("aria-pressed", card.getAttribute("data-file") === name ? "true" : "false");
+    }
+  }
+
+  function buildCards(files) {
+    var holder = byId("cards");
+    if (!holder) {
+      return;
+    }
+    while (holder.firstChild) {
+      holder.removeChild(holder.firstChild);
+    }
+    FILE_ORDER.forEach(function (name) {
+      holder.appendChild(buildCard(name, findEntry(files, name)));
+    });
+  }
+
+  function renderMemory(files) {
+    var entry = findEntry(files, "MEMORY");
+    var fill = byId("mem-fill");
+    var text = byId("mem-text");
+    if (!entry) {
+      if (fill) {
+        fill.style.width = "0%";
+        fill.className = "fill";
+      }
+      if (text) {
+        text.textContent = "MEMORY.md 未创建（插件加载时会播种，当前没有可显示的容量）。";
+        text.className = "mem-text";
+      }
+      return;
+    }
+
+    var chars = typeof entry.chars === "number" && isFinite(entry.chars) ? entry.chars : 0;
+    var isOver = chars > softLimit;
+    var ratio = softLimit > 0 ? chars / softLimit : 0;
+    var percentText = Math.round(ratio * 100);
+    var barPercent = Math.max(0, Math.min(100, percentText));
+    if (fill) {
+      fill.style.width = barPercent + "%";
+      fill.className = isOver ? "fill over" : "fill";
+    }
+    if (text) {
+      var label = "MEMORY.md 当前 " + formatChars(chars) + "，软上限 " + formatChars(softLimit) +
+        "（" + formatPercent(percentText) + "）。";
+      if (isOver) {
+        label += "已超过软上限：请合并重复与过期条目，并把历史条目剪切到 memory/archive/MEMORY-YYYYMM.md。";
+      }
+      text.textContent = label;
+      text.className = isOver ? "mem-text over" : "mem-text";
+    }
+  }
+
+  function renderArchive(archive) {
+    var node = byId("archive-text");
+    if (!node) {
+      return;
+    }
+    if (!archive || typeof archive !== "object") {
+      node.textContent = "归档：未提供";
+      return;
+    }
+    var count = typeof archive.count === "number" ? archive.count : 0;
+    var names = Array.isArray(archive.names) ? archive.names : [];
+    var dir = typeof archive.dir === "string" && archive.dir ? archive.dir : "memory/archive";
+    if (!count) {
+      node.textContent = "归档：" + dir + " 下暂无归档文件。";
+      return;
+    }
+    var shown = names.slice(0, 10).join("、");
+    node.textContent = "归档：" + dir + " 下 " + count + " 个文件" + (shown ? "（" + shown + "）" : "") + "。";
+  }
+
+  var MANAGED_LABELS = {
+    created: "正常（已创建托管区段）",
+    updated: "正常（已同步到当前版本）",
+    unchanged: "正常（内容已是最新）",
+    appended: "正常（已追加托管区段）",
+    broken: "异常（标记重复、嵌套或顺序颠倒，未自动重写）",
+    missing_root: "未检测（共享根不存在）",
+    unknown: "未检测"
+  };
+
+  function renderManaged() {
+    var node = byId("st-managed");
+    if (!node) {
+      return;
+    }
+    if (filesManaged === true) {
+      node.textContent = "正常（标记对完整）";
+      return;
+    }
+    if (filesManaged === false) {
+      node.textContent = "异常（未自动重写，请检查 astral:managed 标记）";
+      return;
+    }
+    if (stateManaged) {
+      node.textContent = MANAGED_LABELS[stateManaged] || "状态：" + stateManaged;
+      return;
+    }
+    node.textContent = "未检测";
+  }
+
+  function applyFiles(data) {
+    if (!data || typeof data !== "object") {
+      addError("文件清单接口返回了无法识别的数据。");
+      return;
+    }
+    if (typeof data.shared_root === "string" && data.shared_root) {
+      filesRoot = data.shared_root;
+    }
+    applyMemoryLimit(data.memory_soft_limit);
+    renderRoot();
+
+    var files = Array.isArray(data.files) ? data.files : [];
+    if (!files.length) {
+      addError("文件清单为空：共享根下没有可显示的四个文件。");
+    }
+    buildCards(files);
+    renderMemory(files);
+    renderArchive(data.archive);
+    var extraEntry = findEntry(files, "EXTRA");
+    if (extraEntry && typeof extraEntry.managed_ok === "boolean") {
+      filesManaged = extraEntry.managed_ok;
+    }
+    renderManaged();
+
+    var initial = findEntry(files, "SOUL") || files[0] || null;
+    if (initial && typeof initial.name === "string") {
+      selectFile(initial.name.toUpperCase());
+    } else {
+      setText("preview-meta", "没有可预览的文件。");
+    }
+  }
+
+  function renderPreview(name, data) {
+    var label = FILE_LABELS[name] || name;
+    if (!data || typeof data !== "object") {
+      setText("preview-meta", label + "：接口返回了无法识别的数据。");
+      setText("preview", "接口返回了无法识别的数据。");
+      return;
+    }
+
+    var meta = [label];
+    if (typeof data.abs_path === "string" && data.abs_path) {
+      meta.push(data.abs_path);
+    }
+    if (typeof data.chars === "number") {
+      meta.push(formatChars(data.chars));
+    }
+    if (data.mtime) {
+      meta.push("更新于 " + formatTime(data.mtime));
+    }
+    if (typeof data.encoding === "string" && data.encoding) {
+      meta.push("编码 " + data.encoding);
+    }
+    if (data.truncated === true) {
+      meta.push("文件超过 512 KB，仅显示前 512 KB");
+    }
+    setText("preview-meta", meta.join(" · "));
+
+    var previewNode = byId("preview");
+    if (!previewNode) {
+      return;
+    }
+    if (data.exists === false) {
+      var absPath = typeof data.abs_path === "string" ? data.abs_path : "共享根下";
+      previewNode.textContent = "（" + label + " 不存在：" + absPath + "；插件加载时会播种）";
+      return;
+    }
+    if (typeof data.content !== "string") {
+      previewNode.textContent = "（接口没有返回正文）";
+      return;
+    }
+    previewNode.textContent = data.content === "" ? "（空文件）" : data.content;
+  }
+
+  function selectFile(name) {
+    selectedName = name;
+    markSelected(name);
+    setText("preview-meta", "正在读取 " + (FILE_LABELS[name] || name) + " …");
+    setText("preview", "");
+    requestFile(name).then(function (data) {
+      if (selectedName !== name) {
+        return;
+      }
+      renderPreview(name, data);
+    }, function (error) {
+      if (selectedName !== name) {
+        return;
+      }
+      addError("读取 " + (FILE_LABELS[name] || name) + " 失败：" + describeError(error) + "。");
+      setText("preview-meta", (FILE_LABELS[name] || name) + " 读取失败");
+      setText("preview", "读取失败，详见页面顶部的红色提示条。");
+    });
+  }
+
+  function loadData() {
+    requestState().then(applyState, applyStateError);
+    requestFileList().then(applyFiles, function (error) {
+      addError("读取文件清单失败：" + describeError(error) + "。");
+      setText("preview-meta", "文件清单读取失败，详见页面顶部的红色提示条。");
+    });
+  }
+
+  function start() {
+    if (!bridge || typeof bridge.apiGet !== "function") {
+      showNotice("请在 AstrBot WebUI 的插件页中打开：本页依赖插件页通信组件才能读取状态与文件。");
+      setBadge("不可用", "warn");
+      setText("st-root", "不可用");
+      setText("st-managed", "不可用");
+      setText("st-consumers", "不可用");
+      setText("st-runtime", "不可用");
+      setText("st-baseline", "不可用");
+      setText("st-disk", "不可用");
+      setText("st-quota", "不可用");
+      setText("mem-text", "页面未连接 AstrBot WebUI，无法读取容量。");
+      setText("preview-meta", "页面未连接 AstrBot WebUI。");
+      setText("preview", "请在 AstrBot WebUI 的插件页中打开。");
+      return;
+    }
+
+    var ready = null;
+    try {
+      ready = typeof bridge.ready === "function" ? bridge.ready() : null;
+    } catch (error) {
+      ready = null;
+    }
+
+    var contextTimer = window.setTimeout(function () {
+      showNotice("还没有收到 AstrBot WebUI 的页面上下文：请在 AstrBot WebUI 的插件页中打开本页。");
+    }, CONTEXT_TIMEOUT_MS);
+
+    if (ready && typeof ready.then === "function") {
+      ready.then(function () {
+        window.clearTimeout(contextTimer);
+      }, function (error) {
+        window.clearTimeout(contextTimer);
+        addError("插件页上下文初始化失败：" + describeError(error) + "。");
+      });
+    } else {
+      window.clearTimeout(contextTimer);
+    }
+
+    loadData();
+  }
+
+  function boot() {
+    try {
+      start();
+    } catch (error) {
+      addError("页面初始化失败：" + describeError(error) + "。");
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+</body>
+</html>
