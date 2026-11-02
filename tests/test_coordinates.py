@@ -1,8 +1,13 @@
-"""Baseline coordinate checks for AstrBot 4.29.4.
+"""Baseline coordinate checks for the declared AstrBot support window.
 
 These tests answer one question: are the four workspace resolvers still where
 the patch expects them, with the signatures the wrappers mimic, and do the
 known consumers still bind them through top level 'from ... import'?
+
+The tested baseline is AstrBot 4.29.4; the support window declared in
+metadata.yaml is wider (>=4.27.0,<5) because the resolvers are unchanged
+across it. The version gate below reads that same metadata so the tests and
+the market gate can never drift apart.
 """
 
 from __future__ import annotations
@@ -15,6 +20,8 @@ from types import ModuleType
 from typing import Any
 
 import pytest
+from packaging.specifiers import SpecifierSet
+from packaging.version import InvalidVersion, Version
 
 BASELINE = {"astrbot": "4.29.4", "commit": "831abae85"}
 
@@ -103,12 +110,24 @@ def test_workspace_functions_match_baseline():
     assert detect_drift(workspace) == []
 
 
+def _declared_spec() -> SpecifierSet:
+    """Read astrbot_version from metadata.yaml (single source of truth)."""
+    metadata = Path(__file__).resolve().parent.parent / "metadata.yaml"
+    for line in metadata.read_text(encoding="utf-8").splitlines():
+        if line.startswith("astrbot_version:"):
+            return SpecifierSet(line.split(":", 1)[1].strip().strip('"'))
+    raise AssertionError("metadata.yaml has no astrbot_version")
+
+
 def astrbot_version_is_supported() -> bool:
+    """True when the running AstrBot sits inside the declared support window."""
     import astrbot
 
     version = str(getattr(astrbot, "__version__", ""))
-    major = version.split(".")[0]
-    return major == BASELINE["astrbot"].split(".")[0]
+    try:
+        return Version(version) in _declared_spec()
+    except InvalidVersion:
+        return False
 
 
 def test_drift_detection_flags_renamed_symbol():

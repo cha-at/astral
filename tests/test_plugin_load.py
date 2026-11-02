@@ -8,6 +8,7 @@ registration are exercised exactly as in a real instance.
 from __future__ import annotations
 
 import importlib
+import re
 import sys
 from pathlib import Path
 
@@ -66,8 +67,25 @@ def test_metadata_matches_spec():
     assert "name: astrbot_plugin_astral" in text
     assert "display_name: Astral" in text
     assert "astrbot_version:" in text
-    assert "4.29" in text
+    assert "4.29" in text  # the tested baseline stays visible in the description
     assert "helloworld" not in text
+
+
+def test_astrbot_version_range_is_the_declared_window():
+    """The market gate must be PEP 440 and cover 4.27.0 .. 5.0 (exclusive)."""
+    from packaging.specifiers import SpecifierSet
+    from packaging.version import Version
+
+    root = Path(__file__).resolve().parent.parent
+    text = (root / "metadata.yaml").read_text(encoding="utf-8")
+    match = re.search(r'^astrbot_version:\s*"([^"]+)"', text, re.MULTILINE)
+    assert match, "metadata.yaml has no astrbot_version"
+    spec = SpecifierSet(match.group(1))
+
+    assert Version("4.27.0") in spec, "the documented lower bound must install"
+    assert Version("4.29.4") in spec, "the tested baseline must install"
+    assert Version("4.26.9") not in spec, "below the supported window"
+    assert Version("5.0.0") not in spec, "5.x is outside the declared window"
 
 
 def test_no_helloworld_template_remnants():

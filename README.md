@@ -75,8 +75,8 @@ Bot：你们固定周五晚八点开黑，别撞车。
 | --- | --- |
 | 不能修改内置 WebUI | Astral 不能给 AstrBot 内置 WebUI 加按钮、加标签页，也不能替换"工作区文件"面板；Astral 只有自己的插件页（WebUI → 插件 → Astral） |
 | 不改 AstrBot 源码 | 全部通过运行期 monkeypatch 包装工作区解析函数实现；插件目录之外的代码零改动，停用插件即还原 |
-| 安全影响（monkeypatch） | 接管 `resolve_project_workspace_root` 会让 AstrBot 针对 API-key 项目与 custom workspace 的越界校验不再生效；只在受信任的实例上使用，并绑定 4.29.x |
-| 只适配 AstrBot 4.29.x | 补丁绑定具体源码位置；其它版本在插件市场显示"不支持"，升级 AstrBot 后要按[升级与备份](#升级与备份)一节回归 |
+| 安全影响（monkeypatch） | 接管 `resolve_project_workspace_root` 会让 AstrBot 针对 API-key 项目与 custom workspace 的越界校验不再生效；只在受信任的实例上使用，并绑定兼容窗口（见下一行） |
+| 兼容 AstrBot 4.27.0 – 4.x | 补丁绑定的工作区解析入口自 4.27.0 起未变，但只在 4.29.4 上完整实测；低于 4.27.0 或 5.x 在插件市场显示"不支持"，升级 AstrBot 后要按[升级与备份](#升级与备份)一节回归 |
 | 不支持多进程 | 补丁只在各自进程内生效；多 worker 部署下各进程各打各的补丁，行为无法保证 |
 | `computer_use_runtime=sandbox` 时工作区不参与 Agent 执行 | Agent 在容器内的 `/workspace` 里干活，与宿主机共享根无关；`/astral status` 会提示 |
 | 没有文件上传与在线编辑 | 插件页只读；写文件请用聊天里的文件工具，或直接编辑共享根下的文件 |
@@ -256,7 +256,7 @@ Set-Location "C:\AstrBot\data\plugins\astrbot_plugin_astral"
 
 ## 维护者信息
 
-- 基线：AstrBot 4.29.4（源码提交 `831abae85`），兼容版本范围 `>=4.29.4,<4.30`；补丁绑定具体源码位置，不保证其它版本可用。
+- 基线：AstrBot 4.29.4（源码提交 `831abae85`），兼容版本范围 `>=4.27.0,<5`；工作区解析入口自 4.27.0 起未变（4.27.0 与 4.29.4 的 `astrbot/core/workspace.py` 逐字节一致），4.27.0 与 4.30+ 未实测，装完先跑 `/astral status` 确认。
 - 运行环境：随 AstrBot 4.29.4（Python 3.12+），Windows / macOS / Linux，单进程部署。
 - 实现说明：[docs/dev-notes.md](docs/dev-notes.md)（模块地图、对外契约与升级回归清单）。
 - `Astral` 仅作为本插件展示名；本项目与 Astral Software Inc.（Ruff / uv）无关，也未发布同名 Python 包。

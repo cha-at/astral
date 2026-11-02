@@ -111,7 +111,8 @@ $env:ASTRBOT_ROOT = "$env:TEMP\astral-testroot"
 
 ## 5. 已知限制与后续
 
-- 补丁依赖 AstrBot 4.29.x 的解析入口；升级后按下面的「升级回归清单」核对，漂移时 `state.reason` 会显示缺失函数名。
+- 补丁依赖 AstrBot 4.27.0 起未变的工作区解析入口（4.27.0 与 4.29.4 的 `astrbot/core/workspace.py` 逐字节一致，同一 blob）；升级后按下面的「升级回归清单」核对，漂移时 `state.reason` 会显示缺失函数名。
+- AstrBot 4.29.0 自身在 Windows 上有一处 Computer Use 文件读写回归（上游 #10584，4.29.1 修复），那一版上记忆写入可能不可用；属上游问题，与补丁无关，不单独排除该版本。
 - 叶子兜底（`default_workspace_root` / `project_workspace_root`）不覆盖三处「本地重算」路径。
 - 同一进程内快照冻结，改文件后要 `/new`；`/reset` 不换 cid；重启或重载插件后按当前文件重建。
 - 页面标题/描述在 `.astrbot-plugin/i18n/*.json` 的 `views.astral`；AstrBot 4.29.4 通过 i18n 读取。
