@@ -4,48 +4,56 @@ Pure standard-library module: no network, no database, no writes to disk. The
 only side effects are read-only file access and log records. Any unexpected
 failure degrades to a tiny block so an LLM request never fails because of the
 snapshot (spec FR-3, NFR-7).
+
+The rendered block is written for the model, not for a maintainer: it reads as
+"here is who you are and what you remember", carries no file lengths, no
+conversation ids and no plugin bookkeeping, and strips the HTML comments that
+hold notes for humans.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 
 logger = logging.getLogger("astrbot")
 
-# Fixed header / footer text (plan section 4.1). Keep them as constants so tests
-# can assert on them and a v1 -> v2 upgrade is a one-line change.
-HEADER = "[Astral Memory Snapshot] v1"
-HEADER_TEMPLATE = HEADER + " | conv={conv} | frozen_at={frozen_at}"
-PRIORITY_LINE = (
-    "优先级：AstrBot 安全策略 > SOUL.md 的边界 > Persona Instructions > "
-    "SOUL.md 的身份与语气 > MEMORY.md 的事实。"
+# Fixed header / footer text. Keep them as constants so tests can assert on
+# them and a v1 -> v2 upgrade is a one-line change.
+HEADER = "# 关于你自己"
+INTRO_LINES = (
+    "下面两段是对话开始时你读到的东西：你是怎样说话的人，以及你记得的事。",
+    "它们是你自己的东西，不是别人派给你的任务——照这个说话就行。",
+    "别念标题，也别提「文件」「文档」「快照」「提示词」这类词。",
 )
-FREEZE_LINE = "本快照在本对话内冻结，不随后续消息刷新。"
-SOUL_TITLE = "### SOUL.md（身份与边界 · {chars} 字符）"
-MEMORY_TITLE = "### MEMORY.md（长期记忆 · {chars} 字符）"
-FOOTER_TITLE = "### 快照说明"
+INTRO = "\n".join(INTRO_LINES)
+SOUL_TITLE = "## 你的性格和说话方式"
+MEMORY_TITLE = "## 你记得"
 FOOTER_LINES = (
-    "- 以上内容在本对话开始时冻结，磁盘上的文件可能已更新。",
-    "- 需要最新内容：用 astrbot_file_read_tool 读取 SOUL.md / MEMORY.md（相对路径以当前工作区根为基准）。",
-    "- 想换成新快照：/new。",
+    "以上是对话开始时读到的，之后可能已经变过；和这轮说的冲突时，以现在为准。",
+    "想改自己：先问，再改 SOUL.md；想记东西：写 MEMORY.md（相对工作区根）。",
 )
-FOOTER = "\n".join((FOOTER_TITLE,) + FOOTER_LINES)
+FOOTER = "\n".join(FOOTER_LINES)
 
 # Minimal Chinese fallback for unexpected failures. Must stay <= 200 chars.
 DEGRADED_BLOCK = (
-    HEADER + " | conv=unavailable\n"
-    "（记忆快照不可用：读取记忆文件时发生未预期错误，详见日志；本对话可继续正常进行。）"
+    HEADER + "\n"
+    "（这份记忆这次没读出来，详见日志；对话可以正常继续。）"
 )
 
 ARCHIVE_INDEX_LIMIT = 10
 DEFAULT_SOUL_BUDGET = 4000
 DEFAULT_MEMORY_BUDGET = 8000
 DEFAULT_SOFT_LIMIT = 20000
+
+# Notes written for humans live in HTML comments; they must never reach the
+# model together with the seeded boilerplate.
+_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+_BLANK_LINES_RE = re.compile(r"\n{3,}")
 
 
 @dataclass
@@ -70,6 +78,13 @@ def _is_within(path: Path, root: Path) -> bool:
         return path.resolve().is_relative_to(root.resolve())
     except (OSError, RuntimeError, ValueError):
         return False
+
+
+def strip_comments(text: str) -> str:
+    """Drop HTML comments and the blank lines they leave behind."""
+    cleaned = _COMMENT_RE.sub("", text)
+    cleaned = _BLANK_LINES_RE.sub("\n\n", cleaned)
+    return cleaned.strip("\r\n")
 
 
 def _load_section(root: Path, root_resolved: Path, name: str) -> _Section:
@@ -122,8 +137,8 @@ def _usable(section: _Section) -> bool:
 
 def _truncation_notice(name: str, total: int, budget: int, abs_path: str) -> str:
     return (
-        f"[已截断：{name} 原文 {total} 字符，此处仅保留前 {budget} 字符。"
-        f"完整内容：{abs_path}（可用 astrbot_file_read_tool 读取）]"
+        f"[太长：{name} 原文 {total} 字符，这里只留了前 {budget} 字符。"
+        f"全文：{abs_path}]"
     )
 
 
@@ -145,7 +160,7 @@ def _archive_index(root: Path, limit: int = ARCHIVE_INDEX_LIMIT) -> str | None:
             return None
         entries.sort(key=lambda pair: pair[0])
         names = [f"{name} ({size / 1024:.1f} KB)" for name, size in entries[:limit]]
-        return "[归档索引] memory/archive/：" + "、".join(names)
+        return "（旧记忆在 memory/archive/：" + "、".join(names) + "）"
     except Exception:  # noqa: BLE001 - archive listing never breaks injection
         logger.debug("astral: snapshot: archive listing failed", exc_info=True)
         return None
@@ -153,20 +168,19 @@ def _archive_index(root: Path, limit: int = ARCHIVE_INDEX_LIMIT) -> str | None:
 
 def _section_body(section: _Section, budget: int, archive_root: Path | None) -> str:
     if section.state == "empty":
-        return f"（{section.name} 为空文件）"
+        return "（还是空的）"
     if section.state == "missing":
-        return (
-            f"（{section.name} 不存在：{section.abs_path}；"
-            "需要时可用 astrbot_file_write_tool 创建）"
-        )
+        return f"（还没有这份文件：{section.abs_path}）"
     if section.state == "escape":
-        return f"（{section.name} 指向共享根之外，已拒绝读取）"
+        return "（指向共享根之外，已跳过）"
     if section.state == "error":
-        return section.notice or f"（读取失败：OSError；详见日志）"
+        return section.notice or "（读取失败：OSError；详见日志）"
 
-    text = section.text or ""
-    body = text
+    text = strip_comments(section.text or "")
+    if not text:
+        return "（还是空的）"
     budget = max(0, int(budget))
+    body = text
     if len(text) > budget:
         body = text[:budget] + "\n" + _truncation_notice(
             section.name, len(text), budget, section.abs_path
@@ -177,38 +191,26 @@ def _section_body(section: _Section, budget: int, archive_root: Path | None) -> 
                 body += "\n" + index
     if section.state == "non_utf8":
         body += "\n（含非 UTF-8 字节，已按替换字符显示）"
-    # Trailing newlines are not meaningful in the rendered block; drop them so
-    # exactly one blank line separates sections (plan section 4.1).
     return body.rstrip("\r\n")
 
 
 def _capacity_hint(chars: int, soft_limit: int) -> str:
     return (
-        "### 容量提示\n"
-        f"- MEMORY.md 当前 {chars} 字符，超过软上限 {soft_limit} 字符。\n"
-        "- 建议：先合并重复与过期条目，再把历史条目剪切到 "
-        "memory/archive/MEMORY-YYYYMM.md。"
+        "## 容量提示\n"
+        f"- MEMORY.md 现在 {chars} 字符，超过软上限 {soft_limit} 字符。\n"
+        "- 先把重复和过期的合并，再把旧条目剪到 memory/archive/MEMORY-YYYYMM.md。"
     )
 
 
-def _format_header(cid: str | None, now: str | None) -> str:
-    conv = (cid or "no-conv")[:8]
-    if now is None:
-        frozen_at = datetime.now().astimezone().isoformat(timespec="seconds")
-    else:
-        frozen_at = now
-    return HEADER_TEMPLATE.format(conv=conv, frozen_at=frozen_at)
-
-
-def _both_unavailable(root: Path, header: str) -> str:
-    label = "（SOUL.md 与 MEMORY.md 均不可用："
+def _both_unavailable(root: Path, header: str = HEADER) -> str:
+    label = "（这两份记忆文件这次都没读出来："
     path = str(root)
-    block = f"{header}\n{label}{path}）"
+    block = f"{header}\n{label}{path}；对话可以正常继续，详见日志。）"
     if len(block) > 200:
-        available = 200 - len(header) - 1 - len(label) - 1
+        available = 200 - len(header) - 1 - len(label) - 1 - len("；对话可以正常继续，详见日志。）")
         if available > 1 and len(path) > available:
             path = "…" + path[-(available - 1):]
-            block = f"{header}\n{label}{path}）"
+            block = f"{header}\n{label}{path}；对话可以正常继续，详见日志。）"
     if len(block) > 200:
         block = block[:200]
     return block
@@ -220,10 +222,7 @@ def _render(
     soul_budget: int,
     memory_budget: int,
     soft_limit: int,
-    cid: str | None,
-    now: str | None,
 ) -> str:
-    header = _format_header(cid, now)
     root = Path(root)
     try:
         root_resolved = root.resolve()
@@ -231,23 +230,23 @@ def _render(
         root_resolved = root.absolute()
     if not root.is_dir():
         logger.warning("astral: snapshot: shared root missing: %s", root)
-        return _both_unavailable(root, header)
+        return _both_unavailable(root)
 
     soul = _load_section(root, root_resolved, "SOUL.md")
     memory = _load_section(root, root_resolved, "MEMORY.md")
     if not _usable(soul) and not _usable(memory):
         logger.warning("astral: snapshot: both memory files unavailable: %s", root)
-        return _both_unavailable(root, header)
+        return _both_unavailable(root)
 
     parts = [
-        header,
-        PRIORITY_LINE,
-        FREEZE_LINE,
+        HEADER,
         "",
-        SOUL_TITLE.format(chars=soul.chars),
+        INTRO,
+        "",
+        SOUL_TITLE,
         _section_body(soul, soul_budget, None),
         "",
-        MEMORY_TITLE.format(chars=memory.chars),
+        MEMORY_TITLE,
         _section_body(memory, memory_budget, root),
         "",
         FOOTER,
@@ -264,8 +263,6 @@ def render(
     soul_budget: int = DEFAULT_SOUL_BUDGET,
     memory_budget: int = DEFAULT_MEMORY_BUDGET,
     soft_limit: int = DEFAULT_SOFT_LIMIT,
-    cid: str | None = None,
-    now: str | None = None,
 ) -> str:
     """Render one frozen snapshot block. Never raises."""
     try:
@@ -274,8 +271,6 @@ def render(
             soul_budget=soul_budget,
             memory_budget=memory_budget,
             soft_limit=soft_limit,
-            cid=cid,
-            now=now,
         )
     except Exception:
         logger.exception("astral: snapshot render failed")
@@ -324,13 +319,12 @@ __all__ = [
     "DEGRADED_BLOCK",
     "FOOTER",
     "FOOTER_LINES",
-    "FOOTER_TITLE",
-    "FREEZE_LINE",
     "HEADER",
-    "HEADER_TEMPLATE",
+    "INTRO",
+    "INTRO_LINES",
     "MEMORY_TITLE",
-    "PRIORITY_LINE",
     "SOUL_TITLE",
     "SnapshotCache",
     "render",
+    "strip_comments",
 ]

@@ -4,875 +4,539 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Astral · 共享工作区</title>
+<title>Astral · 它记得什么</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
-
-  :root {
-    color-scheme: light;
-    --bg: #f5f6f8;
-    --surface: #ffffff;
-    --text: #1f2329;
-    --muted: #5c6470;
-    --border: #dfe3e8;
-    --accent: #3568d4;
-    --ok: #1b7a3d;
-    --warn: #8a5a00;
-    --danger: #b3261e;
-    --danger-bg: #fdecea;
-    --notice-bg: #fff7e0;
-    --notice-border: #e6c26a;
-    --bar-bg: #e6e9ee;
-    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --bg: #14161a;
-      --surface: #1c1f25;
-      --text: #e7e9ec;
-      --muted: #9aa3ad;
-      --border: #2c3138;
-      --accent: #7a9bff;
-      --ok: #5fce8a;
-      --warn: #e5b567;
-      --danger: #ff8a80;
-      --danger-bg: #3a1d1c;
-      --notice-bg: #322810;
-      --notice-border: #8a6a1f;
-      --bar-bg: #2a2f37;
-    }
-  }
-
-  :root[data-theme="dark"] {
-    color-scheme: dark;
-    --bg: #14161a;
-    --surface: #1c1f25;
-    --text: #e7e9ec;
-    --muted: #9aa3ad;
-    --border: #2c3138;
-    --accent: #7a9bff;
-    --ok: #5fce8a;
-    --warn: #e5b567;
-    --danger: #ff8a80;
-    --danger-bg: #3a1d1c;
-    --notice-bg: #322810;
-    --notice-border: #8a6a1f;
-    --bar-bg: #2a2f37;
-  }
-
+  :root { color-scheme: light; --bg: #f5f6f8; --surface: #ffffff; --surface-2: #f0f2f5; --text: #1f2329; --muted: #5c6470; --border: #dfe3e8; --accent: #3568d4; --ok: #1b7a3d; --warn: #8a5a00; --danger: #b3261e; --danger-bg: #fdecea; --notice-bg: #fff7e0; --notice-border: #e6c26a; --chip-bg: #eef1f5; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --bg: #14161a; --surface: #1c1f25; --surface-2: #23272e; --text: #e7e9ec; --muted: #9aa3ad; --border: #2c3138; --accent: #7a9bff; --ok: #5fce8a; --warn: #e5b567; --danger: #ff8a80; --danger-bg: #3a1d1c; --notice-bg: #322810; --notice-border: #8a6a1f; --chip-bg: #262b33; } }
+  :root[data-theme="dark"] { color-scheme: dark; --bg: #14161a; --surface: #1c1f25; --surface-2: #23272e; --text: #e7e9ec; --muted: #9aa3ad; --border: #2c3138; --accent: #7a9bff; --ok: #5fce8a; --warn: #e5b567; --danger: #ff8a80; --danger-bg: #3a1d1c; --notice-bg: #322810; --notice-border: #8a6a1f; --chip-bg: #262b33; }
   html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
-  body {
-    font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
-    font-size: 14px;
-    line-height: 1.6;
-  }
-  .wrap { width: 100%; max-width: 960px; margin: 0 auto; padding: 16px; }
-  h1 { font-size: 20px; margin: 0 0 12px; }
-  h2 { font-size: 15px; margin: 20px 0 8px; }
-  h3 { font-size: 15px; margin: 0 0 2px; font-family: var(--mono); }
+  body { font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif; font-size: 14px; line-height: 1.65; }
+  .wrap { width: 100%; max-width: 960px; margin: 0 auto; padding: 18px 20px 32px; }
+  h1 { font-size: 21px; margin: 0; letter-spacing: 0.01em; }
+  h2 { font-size: 16px; margin: 0; }
+  h3 { font-size: 13px; margin: 0; }
+  h4 { font-size: 13px; margin: 14px 0 4px; }
+  h5 { font-size: 13px; margin: 12px 0 4px; font-weight: 600; }
   p { margin: 6px 0; }
-  code {
-    font-family: var(--mono);
-    font-size: 12px;
-    background: var(--bar-bg);
-    padding: 1px 4px;
-    border-radius: 4px;
-    overflow-wrap: anywhere;
-  }
-
-  .banner {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 8px;
-    align-items: baseline;
-    padding: 12px 14px;
-    border: 1px solid var(--notice-border);
-    background: var(--notice-bg);
-    border-radius: 10px;
-  }
-  .banner strong { font-size: 15px; }
-  .banner span { overflow-wrap: anywhere; }
-
-  .notice {
-    margin-top: 12px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid var(--notice-border);
-    background: var(--notice-bg);
-    overflow-wrap: anywhere;
-  }
-  .errorbar {
-    margin-top: 12px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid var(--danger);
-    background: var(--danger-bg);
-    color: var(--danger);
-    overflow-wrap: anywhere;
-  }
-
-  .section { margin-top: 16px; }
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-  }
-
-  .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 16px; margin: 0; }
-  .kv div { min-width: 0; }
+  code { font-family: var(--mono); font-size: 12px; background: var(--chip-bg); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
+  a { color: var(--accent); }
+  .page-head { margin-bottom: 14px; }
+  .sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  .notice, .errorbar { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; overflow-wrap: anywhere; font-size: 13px; }
+  .notice { border: 1px solid var(--notice-border); background: var(--notice-bg); }
+  .errorbar { border: 1px solid var(--danger); background: var(--danger-bg); color: var(--danger); }
+  .statusline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font-size: 13px; min-width: 0; }
+  .statusline span { min-width: 0; overflow-wrap: anywhere; }
+  .badge { display: inline-block; padding: 0 9px; border-radius: 999px; border: 1px solid currentColor; font-size: 12px; line-height: 20px; white-space: nowrap; }
+  .badge.ok { color: var(--ok); } .badge.bad { color: var(--danger); } .badge.warn { color: var(--warn); } .badge.neutral { color: var(--muted); }
+  .st-danger { color: var(--danger); }
+  .st-action { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--danger-bg); color: var(--danger); font-size: 13px; overflow-wrap: anywhere; }
+  .warnbox { margin: 12px 0 0; padding: 12px 14px; border: 1px solid var(--notice-border); border-radius: 12px; background: var(--notice-bg); }
+  .warnbox h2 { font-size: 13px; margin: 0 0 6px; color: var(--warn); }
+  .warnbox ul { margin: 0; padding-left: 18px; }
+  .warn-item { margin: 6px 0; overflow-wrap: anywhere; }
+  .warn-text { display: block; }
+  .warn-action { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+  .privacy { margin: 12px 0 0; padding: 8px 14px; border: 1px dashed var(--border); border-radius: 12px; background: var(--surface); font-size: 13px; color: var(--muted); }
+  .privacy summary { cursor: pointer; color: var(--text); font-weight: 600; }
+  .privacy p { margin: 6px 0 2px; }
+  .card { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+  .card-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px 12px; }
+  .card-desc { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+  .tabs { display: flex; gap: 6px; margin-left: auto; }
+  .tab { padding: 3px 12px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; line-height: 20px; cursor: pointer; user-select: none; color: var(--muted); }
+  .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #ffffff; }
+  .summary { margin: 12px 0 0; font-size: 13px; color: var(--muted); }
+  .summary strong { color: var(--text); font-weight: 600; }
+  .groups { margin-top: 12px; min-width: 0; }
+  .mem-group + .mem-group { margin-top: 16px; }
+  .mem-group-title { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .count { padding: 0 7px; border-radius: 999px; background: var(--chip-bg); color: var(--muted); font-size: 11px; line-height: 18px; font-weight: 400; }
+  .entries { list-style: none; margin: 0; padding: 0; }
+  .entry { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 8px 0; border-bottom: 1px solid var(--border); min-width: 0; }
+  .entry:last-child { border-bottom: 0; padding-bottom: 2px; }
+  .chip { flex: 0 0 auto; padding: 0 7px; border: 1px solid var(--border); border-radius: 999px; background: var(--chip-bg); color: var(--muted); font-size: 12px; line-height: 19px; white-space: nowrap; }
+  .chip.date { color: var(--accent); border-color: var(--accent); background: transparent; }
+  .entry-text { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .empty { margin: 14px 0 4px; color: var(--muted); }
+  .hint { margin: 8px 0 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+  pre { width: 100%; max-width: 100%; max-height: 420px; overflow: auto; margin: 10px 0 0; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text); font-family: var(--mono); font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2; }
+  .rich { margin-top: 10px; min-width: 0; }
+  .rich-h { margin: 14px 0 2px; font-size: 14px; }
+  .rich-p { margin: 6px 0; overflow-wrap: anywhere; }
+  .rich-quote { margin: 6px 0; padding-left: 10px; border-left: 2px solid var(--border); color: var(--muted); }
+  .rich-list { margin: 4px 0; padding-left: 20px; }
+  .rich-list li { margin: 3px 0; overflow-wrap: anywhere; }
+  .fold { margin-top: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 0 16px; }
+  .fold > summary { padding: 12px 0; cursor: pointer; font-weight: 600; font-size: 13px; }
+  .fold-body { padding: 0 0 14px; }
+  .filerow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 9px 0; border-bottom: 1px solid var(--border); cursor: pointer; min-width: 0; }
+  .filerow:last-of-type { border-bottom: 0; }
+  .filerow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .filerow[aria-expanded="true"] .file-hint { color: var(--muted); }
+  .file-name { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+  .file-role { flex: 1 1 220px; color: var(--muted); font-size: 12px; min-width: 0; }
+  .file-hint { color: var(--accent); font-size: 12px; }
+  .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 18px; margin: 0; }
+  .kv > div { min-width: 0; }
   .kv dt { color: var(--muted); font-size: 12px; }
   .kv dd { margin: 0; overflow-wrap: anywhere; }
   .mono { font-family: var(--mono); font-size: 12px; }
-
-  .badge {
-    display: inline-block;
-    padding: 0 8px;
-    border-radius: 999px;
-    border: 1px solid currentColor;
-    font-size: 12px;
-    line-height: 20px;
-  }
-  .badge.ok { color: var(--ok); }
-  .badge.bad { color: var(--danger); }
-  .badge.warn { color: var(--warn); }
-
-  .reason {
-    margin: 10px 0 0;
-    padding: 8px 10px;
-    border-radius: 8px;
-    background: var(--danger-bg);
-    color: var(--danger);
-    overflow-wrap: anywhere;
-  }
-
-  .warnings {
-    margin: 8px 0 0;
-    padding: 8px 10px;
-    border-radius: 8px;
-    border: 1px solid var(--notice-border);
-    background: var(--notice-bg);
-    color: var(--text);
-    overflow-wrap: anywhere;
-  }
-
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-  .file-card {
-    min-width: 0;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface);
-    cursor: pointer;
-  }
-  .file-card:hover { border-color: var(--accent); }
-  .file-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .file-card[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-  .file-card.missing { opacity: 0.75; }
-  .file-subtitle { margin: 0; color: var(--muted); font-size: 12px; }
-  .file-meta { margin: 6px 0 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-
-  .bar { height: 10px; border-radius: 999px; background: var(--bar-bg); overflow: hidden; }
-  .fill { height: 100%; width: 0; background: var(--accent); transition: width 0.2s ease; }
-  .fill.over { background: var(--danger); }
-  .mem-text { color: var(--muted); overflow-wrap: anywhere; }
-  .mem-text.over { color: var(--danger); }
-  .archive-text { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-
-  .preview-meta { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-  pre {
-    max-width: 100%;
-    max-height: 420px;
-    overflow: auto;
-    margin: 8px 0 0;
-    padding: 12px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface);
-    font-family: var(--mono);
-    font-size: 13px;
-    line-height: 1.55;
-    white-space: pre;
-    tab-size: 2;
-  }
-
-  footer {
-    margin-top: 20px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border);
-    color: var(--muted);
-    font-size: 12px;
-  }
-  footer p { margin: 6px 0; overflow-wrap: anywhere; }
-
-  @media (max-width: 380px) {
-    .wrap { padding: 12px; }
-    .cards { grid-template-columns: 1fr; }
-    .kv { grid-template-columns: 1fr; }
-  }
+  .danger-text { color: var(--danger); }
+  footer { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+  footer p { margin: 0; overflow-wrap: anywhere; }
+  @media (max-width: 380px) { .wrap { padding: 12px; } .statusline { align-items: flex-start; flex-direction: column; gap: 4px; } .tabs { margin-left: 0; } .entry-text { flex-basis: 100%; } .file-role { flex-basis: 100%; } }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Astral · 共享工作区</h1>
-
-  <div class="banner">
-    <strong>全局共享</strong>
-    <span>所有平台、所有群、所有私聊共用同一个工作区与同一份记忆；不要写入密钥、口令或第三方隐私。</span>
-  </div>
-
-  <div id="notice" class="notice" hidden>请在 AstrBot WebUI 的插件页中打开：本页依赖插件页通信组件才能读取状态与文件。</div>
+  <header class="page-head">
+    <h1>Astral</h1>
+    <p class="sub">所有平台、所有群共用一份记忆：这里是它此刻记得的东西。</p>
+  </header>
+  <div id="notice" class="notice" hidden>请在 AstrBot WebUI 的插件页中打开：本页依赖插件页通信组件才能读取记忆。</div>
   <div id="error" class="errorbar" role="alert" hidden></div>
-
-  <section class="section" aria-labelledby="status-title">
-    <h2 id="status-title">补丁状态</h2>
-    <div class="panel">
+  <section class="statusline" aria-label="运行状态">
+    <span id="st-badge" class="badge neutral">加载中…</span>
+    <span id="st-inject">记忆注入：—</span>
+    <span id="st-updated">记忆更新时间：—</span>
+  </section>
+  <p id="st-action" class="st-action" hidden></p>
+  <section id="warnbox" class="warnbox" aria-labelledby="warn-title" hidden>
+    <h2 id="warn-title">需要处理</h2>
+    <ul id="warnlist"></ul>
+  </section>
+  <details class="privacy">
+    <summary>全局共享 · 所有平台、所有群共用同一份记忆</summary>
+    <p>写进记忆和工作区的内容，在其他群、其他平台、其他私聊也可能被看到。不要写密钥、口令、他人隐私或未经同意的个人信息。</p>
+  </details>
+  <section class="card" aria-labelledby="mem-title">
+    <div class="card-head">
+      <div>
+        <h2 id="mem-title">它现在记得</h2>
+        <p class="card-desc">它自己写下的长期记忆，最新在最上面。</p>
+      </div>
+      <div class="tabs" role="tablist" aria-label="记忆显示方式">
+        <div id="tab-entries" class="tab active" role="tab" tabindex="0" aria-selected="true" data-mode="entries">条目</div>
+        <div id="tab-raw" class="tab" role="tab" tabindex="0" aria-selected="false" data-mode="raw">原文</div>
+      </div>
+    </div>
+    <p id="mem-summary" class="summary">加载中…</p>
+    <p id="mem-fallback" class="hint" hidden></p>
+    <div id="mem-groups" class="groups"><p class="hint">加载中…</p></div>
+    <p id="mem-empty" class="empty" hidden></p>
+    <pre id="mem-raw" tabindex="0" hidden>加载中…</pre>
+  </section>
+  <section class="card" aria-labelledby="soul-title">
+    <h2 id="soul-title">它的人设</h2>
+    <p class="card-desc">决定它怎么说话、什么不做，来自 <code>SOUL.md</code>。</p>
+    <div id="soul-body" class="rich"><p class="hint">加载中…</p></div>
+  </section>
+  <details class="fold">
+    <summary>其他文件（AGENTS.md / EXTRA_PROMPT.md）</summary>
+    <div class="fold-body">
+      <div class="filerow" role="button" tabindex="0" data-file="AGENTS" aria-expanded="false">
+        <span class="file-name">AGENTS.md</span>
+        <span class="file-role">工作区说明 · 不注入对话</span>
+        <span class="file-hint">查看</span>
+      </div>
+      <div class="filerow" role="button" tabindex="0" data-file="EXTRA" aria-expanded="false">
+        <span class="file-name">EXTRA_PROMPT.md</span>
+        <span class="file-role">注入守则 · Astral 维护其中一段</span>
+        <span class="file-hint">查看</span>
+      </div>
+      <p id="other-meta" class="hint" hidden></p>
+      <pre id="other-raw" tabindex="0" hidden>加载中…</pre>
+    </div>
+  </details>
+  <details class="fold">
+    <summary>运行与维护</summary>
+    <div class="fold-body">
       <dl class="kv">
-        <div><dt>安装状态</dt><dd><span id="st-installed" class="badge warn">加载中…</span></dd></div>
-        <div><dt>共享根</dt><dd id="st-root" class="mono">—</dd></div>
-        <div><dt>托管区段</dt><dd id="st-managed">—</dd></div>
-        <div><dt>消费者</dt><dd id="st-consumers">—</dd></div>
-        <div><dt>运行时</dt><dd id="st-runtime">—</dd></div>
-        <div><dt>基线</dt><dd id="st-baseline">—</dd></div>
-        <div><dt>磁盘</dt><dd id="st-disk">—</dd></div>
-        <div><dt>配额</dt><dd id="st-quota">—</dd></div>
+        <div><dt>共享根</dt><dd id="mx-root" class="mono">—</dd></div>
+        <div><dt>工作区</dt><dd id="mx-disk">—</dd></div>
+        <div><dt>每次对话注入</dt><dd id="mx-budget">—</dd></div>
+        <div><dt>记忆软上限</dt><dd id="mx-soft">—</dd></div>
+        <div><dt>归档</dt><dd id="mx-archive">—</dd></div>
+        <div><dt>托管区段</dt><dd id="mx-managed">—</dd></div>
+        <div><dt>安装时间</dt><dd id="mx-installed">—</dd></div>
       </dl>
-      <p id="st-reason" class="reason" hidden></p>
-      <p id="st-warnings" class="warnings" hidden></p>
+      <p class="hint">备份：整目录拷贝共享根；AstrBot 官方备份不包含工作区文件。修改记忆请用聊天里的文件工具，或直接编辑共享根里的文件。</p>
     </div>
-  </section>
-
-  <section class="section" aria-labelledby="files-title">
-    <h2 id="files-title">四个文件</h2>
-    <div id="cards" class="cards"></div>
-  </section>
-
-  <section class="section" aria-labelledby="memory-title">
-    <h2 id="memory-title">MEMORY.md 容量</h2>
-    <div class="panel">
-      <div class="bar" role="img" aria-label="MEMORY.md 容量占软上限的比例"><div id="mem-fill" class="fill"></div></div>
-      <p id="mem-text" class="mem-text">加载中…</p>
-      <p id="archive-text" class="archive-text">—</p>
-    </div>
-  </section>
-
-  <section class="section" aria-labelledby="preview-title">
-    <h2 id="preview-title">只读预览</h2>
-    <p id="preview-meta" class="preview-meta">加载中…</p>
-    <pre id="preview" tabindex="0">加载中…</pre>
-  </section>
-
+  </details>
   <footer>
-    <p><strong>托管区段</strong>：EXTRA_PROMPT.md 中 <code>astral:managed:begin</code> 与 <code>astral:managed:end</code> 之间的内容由 Astral 在每次插件加载时重写，标记之外的内容属于你。</p>
-    <p><strong>备份</strong>：请整目录拷贝共享根（例如 PowerShell 的 <code>Copy-Item -Recurse</code>）；AstrBot 官方备份不包含工作区文件。</p>
-    <p><strong>只读</strong>：本页不能修改任何文件；修改请直接用文件工具编辑共享根下的文件。</p>
-    <p><strong>源码</strong>：<a href="https://github.com/cha-at/astral" rel="noopener">github.com/cha-at/astral</a>（AGPL-3.0）。</p>
+    <p>只读页：这里不能修改任何文件。源码 <a href="https://github.com/cha-at/astral" rel="noopener">github.com/cha-at/astral</a>（AGPL-3.0）。</p>
   </footer>
 </div>
 <script src="/api/plugin/page/bridge-sdk.js"></script>
 <script>
 (function () {
   "use strict";
-
   var bridge = window.AstrBotPluginView || window.AstrBotPluginPage || null;
-
-  var FILE_ORDER = ["SOUL", "MEMORY", "AGENTS", "EXTRA"];
-  var FILE_LABELS = {
-    SOUL: "SOUL.md",
-    MEMORY: "MEMORY.md",
-    AGENTS: "AGENTS.md",
-    EXTRA: "EXTRA_PROMPT.md"
-  };
-  var FILE_ROLES = {
-    SOUL: "身份与边界（每对话注入）",
-    MEMORY: "长期记忆（每对话注入）",
-    AGENTS: "工作区说明（不注入对话）",
-    EXTRA: "注入守则（Astral 重写托管区段）"
-  };
-  var DEFAULT_SOFT_LIMIT = 20000;
   var REQUEST_TIMEOUT_MS = 15000;
   var CONTEXT_TIMEOUT_MS = 5000;
-
+  var TICK = String.fromCharCode(96);
+  var INLINE_RE = new RegExp("(\\*\\*[^*]+\\*\\*|" + TICK + "[^" + TICK + "]+" + TICK + ")", "g");
   var errorList = [];
-  var selectedName = "";
-  var softLimit = DEFAULT_SOFT_LIMIT;
-  var stateRoot = "";
-  var filesRoot = "";
-  var stateManaged = "";
-  var filesManaged = null;
-
-  function byId(id) {
-    return document.getElementById(id);
+  var stateData = null;
+  var filesData = null;
+  var memoryState = { loaded: false, text: "", meta: null, groups: [], total: 0, latest: "", truncated: false, mode: "entries", empty: false, fallback: false };
+  var otherOpen = "";
+  var MANAGED_LABELS = { created: "正常（已创建托管区段）", updated: "正常（已同步到当前版本）", unchanged: "正常（内容已是最新）", appended: "正常（已追加托管区段）", broken: "异常（标记重复、嵌套或顺序颠倒，未自动重写）", missing_root: "未检测（共享根不存在）", unknown: "未检测" };
+  function byId(id) { return document.getElementById(id); }
+  function setText(id, value) { var node = byId(id); if (node) { node.textContent = value === undefined || value === null ? "" : String(value); } }
+  function show(id, visible) { var node = byId(id); if (node) { node.hidden = !visible; } }
+  function clear(node) { while (node && node.firstChild) { node.removeChild(node.firstChild); } }
+  function el(tag, className, text) { var node = document.createElement(tag); if (className) { node.className = className; } if (text !== undefined && text !== null) { node.textContent = String(text); } return node; }
+  function inlineNodes(text) {
+    var frag = document.createDocumentFragment();
+    var parts = String(text === undefined || text === null ? "" : text).split(INLINE_RE);
+    for (var i = 0; i < parts.length; i += 1) {
+      var part = parts[i];
+      if (!part) { continue; }
+      if (part.length > 4 && part.slice(0, 2) === "**" && part.slice(-2) === "**") {
+        var strong = document.createElement("strong");
+        strong.textContent = part.slice(2, -2);
+        frag.appendChild(strong);
+      } else if (part.length > 2 && part.charAt(0) === TICK && part.charAt(part.length - 1) === TICK) {
+        var code = document.createElement("code");
+        code.textContent = part.slice(1, -1);
+        frag.appendChild(code);
+      } else {
+        frag.appendChild(document.createTextNode(part));
+      }
+    }
+    return frag;
   }
-
-  function setText(id, value) {
-    var node = byId(id);
-    if (node) {
-      node.textContent = value;
-    }
-  }
-
-  function describeError(error) {
-    if (error && typeof error.message === "string" && error.message) {
-      return error.message;
-    }
-    if (typeof error === "string" && error) {
-      return error;
-    }
-    return "未知错误";
-  }
-
-  function addError(message) {
-    if (!message) {
-      return;
-    }
-    if (errorList.indexOf(message) === -1) {
-      errorList.push(message);
-    }
-    var bar = byId("error");
-    if (bar) {
-      bar.textContent = errorList.join("；");
-      bar.hidden = false;
-    }
-  }
-
-  function showNotice(message) {
-    var box = byId("notice");
-    if (!box) {
-      return;
-    }
-    box.textContent = message;
-    box.hidden = false;
-  }
-
-  function pad2(value) {
-    return value < 10 ? "0" + value : String(value);
-  }
-
-  function formatTime(value) {
-    if (!value) {
-      return "时间未知";
-    }
+  function pad2(value) { return value < 10 ? "0" + value : String(value); }
+  function fmtWhen(value) {
+    if (!value) { return "时间未知"; }
     var date = new Date(value);
-    if (isNaN(date.getTime())) {
-      return String(value);
-    }
-    return date.getFullYear() + "-" + pad2(date.getMonth() + 1) + "-" + pad2(date.getDate()) +
-      " " + pad2(date.getHours()) + ":" + pad2(date.getMinutes()) + ":" + pad2(date.getSeconds());
+    if (isNaN(date.getTime())) { return String(value); }
+    var now = new Date();
+    var clock = pad2(date.getHours()) + ":" + pad2(date.getMinutes());
+    var sameDay = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+    if (sameDay) { return "今天 " + clock; }
+    var yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    if (date.getFullYear() === yesterday.getFullYear() && date.getMonth() === yesterday.getMonth() && date.getDate() === yesterday.getDate()) { return "昨天 " + clock; }
+    var days = (now.getTime() - date.getTime()) / 86400000;
+    if (days > 0 && days < 7) { return Math.floor(days) + " 天前"; }
+    if (days < 0) { return clock; }
+    return date.getFullYear() + "-" + pad2(date.getMonth() + 1) + "-" + pad2(date.getDate()) + " " + clock;
   }
-
-  function formatChars(value) {
-    if (typeof value !== "number" || !isFinite(value)) {
-      return "—";
-    }
-    return value.toLocaleString("zh-CN") + " 字符";
-  }
-
-  function formatPercent(value) {
-    if (typeof value !== "number" || !isFinite(value)) {
-      return "—";
-    }
-    return Math.round(value) + "%";
-  }
-
+  function fmtCount(value) { var number = typeof value === "number" && isFinite(value) ? value : 0; try { return number.toLocaleString("zh-CN"); } catch (error) { return String(number); } }
+  function describeError(error) { if (error && typeof error.message === "string" && error.message) { return error.message; } if (typeof error === "string" && error) { return error; } return "未知错误"; }
+  function addError(message) { if (!message) { return; } if (errorList.indexOf(message) === -1) { errorList.push(message); } var bar = byId("error"); if (bar) { bar.textContent = errorList.join("；"); bar.hidden = false; } }
+  function showNotice(message) { var box = byId("notice"); if (!box) { return; } box.textContent = message; box.hidden = false; }
   function withTimeout(request, label) {
     return new Promise(function (resolve, reject) {
-      var timer = window.setTimeout(function () {
-        reject(new Error(label + "请求超时（" + Math.round(REQUEST_TIMEOUT_MS / 1000) + " 秒）"));
-      }, REQUEST_TIMEOUT_MS);
-      request.then(function (value) {
-        window.clearTimeout(timer);
-        resolve(value);
-      }, function (error) {
-        window.clearTimeout(timer);
-        reject(error);
-      });
+      var timer = window.setTimeout(function () { reject(new Error(label + "请求超时（" + Math.round(REQUEST_TIMEOUT_MS / 1000) + " 秒）")); }, REQUEST_TIMEOUT_MS);
+      request.then(function (value) { window.clearTimeout(timer); resolve(value); }, function (error) { window.clearTimeout(timer); reject(error); });
     });
   }
-
-  function ensureRequest(request, label) {
-    if (!request || typeof request.then !== "function") {
-      return Promise.reject(new Error("插件页通信组件没有返回有效响应"));
-    }
-    return withTimeout(request, label);
+  function ensureRequest(request, label) { if (!request || typeof request.then !== "function") { return Promise.reject(new Error("插件页通信组件没有返回有效响应")); } return withTimeout(request, label); }
+  function fetchState() { try { return ensureRequest(bridge.apiGet("state"), "状态接口"); } catch (error) { return Promise.reject(error); } }
+  function fetchFiles() { try { return ensureRequest(bridge.apiGet("files"), "文件清单接口"); } catch (error) { return Promise.reject(error); } }
+  function fetchFile(name) { try { return ensureRequest(bridge.apiGet("files", { name: name }), name + " 文件接口"); } catch (error) { return Promise.reject(error); } }
+  function findEntry(list, name) {
+    if (!Array.isArray(list)) { return null; }
+    for (var i = 0; i < list.length; i += 1) { var entry = list[i]; if (entry && typeof entry.name === "string" && entry.name.toUpperCase() === name) { return entry; } }
+    return null;
   }
-
-  function requestState() {
-    try {
-      return ensureRequest(bridge.apiGet("state"), "状态接口");
-    } catch (error) {
-      return Promise.reject(error);
-    }
+  function actionFor(text) {
+    var value = String(text || "");
+    if (/运行时|沙箱|sandbox|不是本机|宿主机|容器/.test(value)) { return "Agent 现在跑在沙箱或容器里，改不到共享根。把 computer_use_runtime 改成 local（或关闭沙箱）后重载插件。"; }
+    if (/写不进|无法写入|写入失败|不可写|无法写|只读|权限|磁盘/.test(value)) { return "检查共享根目录是否可写（权限、磁盘空间、路径是否存在），处理后重载插件。"; }
+    if (/consumers|版本|补丁|解析函数/.test(value)) { return "重载插件；仍失败说明 AstrBot 版本不匹配，发 /astral status 看缺哪个函数。"; }
+    if (/配额|阈值|体积/.test(value)) { return "清理共享根或调大 quota_gb；Astral 只告警，不会自动删文件。"; }
+    if (/托管|标记/.test(value)) { return "检查 EXTRA_PROMPT.md 里 astral:managed 的起止标记；修不好就删掉该文件让 Astral 重建。"; }
+    if (/注入|memory\.enabled/.test(value)) { return "在插件配置页打开 memory.enabled 后重载插件。"; }
+    if (/共享根/.test(value)) { return "检查插件配置里的 shared_root，改正后重载插件。"; }
+    return "处理后重载插件；原因可发 /astral status 查看。";
   }
-
-  function requestFileList() {
-    try {
-      return ensureRequest(bridge.apiGet("files"), "文件清单接口");
-    } catch (error) {
-      return Promise.reject(error);
-    }
+  function renderWarnings(list) {
+    var items = [];
+    for (var i = 0; i < list.length; i += 1) { if (typeof list[i] === "string" && list[i].trim()) { items.push(list[i].trim()); } }
+    var box = byId("warnbox"); var holder = byId("warnlist"); clear(holder);
+    if (!items.length) { box.hidden = true; return; }
+    for (var j = 0; j < items.length; j += 1) { var li = el("li", "warn-item"); li.appendChild(el("span", "warn-text", items[j])); li.appendChild(el("span", "warn-action", "→ " + actionFor(items[j]))); holder.appendChild(li); }
+    box.hidden = false;
   }
-
-  function requestFile(name) {
-    try {
-      return ensureRequest(bridge.apiGet("files", { name: name }), "文件接口");
-    } catch (error) {
-      return Promise.reject(error);
-    }
+  function isPlaceholder(text) { var value = String(text || "").replace(/\s+/g, "").replace(/[（）()【】\[\]。.]/g, ""); return value === "暂无" || value === "空"; }
+  function splitMeta(text) {
+    var value = String(text || "").trim();
+    var result = { date: "", source: "", text: value };
+    if (!value) { return result; }
+    var match = value.match(/^\[(\d{4}-\d{2}-\d{2})\]\s*(?:\[([^\]]{1,40})\]\s*)?([\s\S]*)$/);
+    if (match) { result.date = match[1]; result.source = (match[2] || "").trim(); result.text = (match[3] || "").trim(); return result; }
+    match = value.match(/^(\d{4}-\d{2}-\d{2})[\s,，:：/-]+([\s\S]+)$/);
+    if (match) { result.date = match[1]; result.text = match[2].trim(); return result; }
+    match = value.match(/^\[([^\]\n]{1,40})\]\s+([\s\S]+)$/);
+    if (match) { result.source = match[1].trim(); result.text = match[2].trim(); }
+    return result;
   }
-
-  function renderRoot() {
-    var root = stateRoot || filesRoot;
-    setText("st-root", root || "未知");
+  function looksLikeInstructions(group) {
+    if (!group.entries.length) { return false; }
+    for (var i = 0; i < group.entries.length; i += 1) { if (group.entries[i].date) { return false; } }
+    for (var j = 0; j < group.entries.length; j += 1) { if (!/memory\/archive|剪切到|归档到/.test(group.entries[j].text)) { return false; } }
+    return true;
   }
-
-  function setBadge(label, kind) {
-    var badge = byId("st-installed");
-    if (!badge) {
-      return;
+  function parseMemory(text) {
+    var lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+    var groups = []; var current = null; var preamble = []; var sawHeading = false;
+    function startGroup(name) { current = { name: name, entries: [] }; groups.push(current); }
+    function addEntry(raw) {
+      var value = String(raw || "").trim();
+      if (!value) { return; }
+      var parsed = splitMeta(value);
+      if (!parsed.text && !parsed.date) { return; }
+      if (isPlaceholder(parsed.text)) { return; }
+      if (!current) { preamble.push(parsed); return; }
+      current.entries.push(parsed);
     }
-    badge.textContent = label;
-    badge.className = "badge " + kind;
+    for (var i = 0; i < lines.length; i += 1) {
+      var line = lines[i]; var trimmed = line.trim();
+      if (!trimmed) { continue; }
+      if (trimmed.indexOf("<!--") === 0) { continue; }
+      if (/^#[^#]/.test(trimmed)) { continue; }
+      if (/^>\s?/.test(trimmed)) { continue; }
+      if (/^([-*_]\s*){3,}$/.test(trimmed)) { continue; }
+      var heading = trimmed.match(/^##\s+(.+)$/);
+      if (heading) { sawHeading = true; startGroup(heading[1].trim()); continue; }
+      var subHeading = trimmed.match(/^#{3,}\s+(.+)$/);
+      if (subHeading) { addEntry(subHeading[1]); continue; }
+      var bullet = trimmed.match(/^[-*+]\s+(.*)$/) || trimmed.match(/^\d+[.)]\s+(.*)$/);
+      if (bullet) { addEntry(bullet[1]); continue; }
+      if (/^[\s\u3000]{2,}/.test(line) && current && current.entries.length) { current.entries[current.entries.length - 1].text += " " + trimmed; continue; }
+      addEntry(trimmed);
+    }
+    if (!sawHeading && preamble.length) { groups = [{ name: "记忆", entries: preamble }]; }
+    else if (preamble.length) { groups.unshift({ name: "记忆", entries: preamble }); }
+    var cleaned = []; var total = 0; var latest = "";
+    for (var g = 0; g < groups.length; g += 1) {
+      var group = groups[g];
+      if (!group.entries.length || looksLikeInstructions(group)) { continue; }
+      cleaned.push(group);
+      for (var e = 0; e < group.entries.length; e += 1) { total += 1; if (group.entries[e].date && group.entries[e].date > latest) { latest = group.entries[e].date; } }
+    }
+    return { groups: cleaned, total: total, latest: latest };
   }
-
-  function applyMemoryLimit(value) {
-    if (typeof value === "number" && isFinite(value) && value > 0) {
-      softLimit = value;
-    }
+  function buildEntry(entry) {
+    var li = el("li", "entry");
+    if (entry.date) { var dateChip = el("span", "chip date", entry.date.slice(5)); dateChip.title = entry.date; li.appendChild(dateChip); }
+    if (entry.source) { li.appendChild(el("span", "chip src", entry.source)); }
+    var body = el("span", "entry-text"); body.appendChild(inlineNodes(entry.text)); li.appendChild(body);
+    return li;
   }
-
-  function applyState(data) {
-    if (!data || typeof data !== "object") {
-      setBadge("状态未知", "warn");
-      addError("状态接口返回了无法识别的数据。");
-      return;
-    }
-
-    if (data.installed === true) {
-      setBadge("已生效", "ok");
-    } else if (data.installed === false) {
-      setBadge("未生效", "bad");
-    } else {
-      setBadge("状态未知", "warn");
-    }
-
-    if (typeof data.shared_root === "string" && data.shared_root) {
-      stateRoot = data.shared_root;
-    }
-    renderRoot();
-
-    var runtime = typeof data.runtime === "string" && data.runtime ? data.runtime : "未知";
-    setText("st-runtime", runtime === "sandbox" ? "sandbox（工作区不参与 Agent 执行）" : runtime);
-
-    var baseline = data.baseline && typeof data.baseline === "object" ? data.baseline : null;
-    if (baseline && baseline.astrbot) {
-      var commit = baseline.commit ? "（" + String(baseline.commit).slice(0, 8) + "）" : "";
-      setText("st-baseline", "AstrBot " + baseline.astrbot + commit);
-    } else {
-      setText("st-baseline", "未知");
-    }
-
-    var disk = data.disk && typeof data.disk === "object" ? data.disk : null;
-    if (disk) {
-      var diskParts = [];
-      diskParts.push(disk.exists === false ? "共享根不存在" : "共享根存在");
-      if (typeof disk.files === "number") {
-        diskParts.push(disk.files + " 个文件");
-      }
-      if (typeof disk.size_mb === "number") {
-        diskParts.push(disk.size_mb + " MB");
-      }
-      setText("st-disk", diskParts.join("，"));
-    } else {
-      setText("st-disk", "未知");
-    }
-
-    var quota = data.quota && typeof data.quota === "object" ? data.quota : null;
-    if (quota && typeof quota.limit_gb === "number" && quota.limit_gb > 0) {
-      var quotaState = quota.warn === true ? "已超限告警" : "未超限";
-      setText("st-quota", quotaState + "（上限 " + quota.limit_gb + " GB，只告警不删除）");
-    } else {
-      setText("st-quota", "不限制");
-    }
-
-    var consumers = data.consumers && typeof data.consumers === "object" ? data.consumers : null;
-    if (consumers) {
-      var functionNames = Object.keys(consumers);
-      var moduleCount = 0;
-      functionNames.forEach(function (name) {
-        var modules = consumers[name];
-        if (Array.isArray(modules)) {
-          moduleCount += modules.length;
-        }
-      });
-      setText("st-consumers", functionNames.length + " 个函数 / " + moduleCount + " 个模块");
-    } else {
-      setText("st-consumers", "未知");
-    }
-
-    if (data.memory && typeof data.memory === "object") {
-      applyMemoryLimit(data.memory.soft_limit_chars);
-      if (typeof data.memory.managed === "string") {
-        stateManaged = data.memory.managed;
-      }
-      renderManaged();
-    }
-
-    var warnings = Array.isArray(data.warnings) ? data.warnings : [];
-    var warningsNode = byId("st-warnings");
-    if (warningsNode) {
-      var warningText = warnings.filter(function (item) {
-        return typeof item === "string" && item;
-      }).join("；");
-      if (warningText) {
-        warningsNode.textContent = "告警：" + warningText;
-        warningsNode.hidden = false;
-      } else {
-        warningsNode.textContent = "";
-        warningsNode.hidden = true;
-      }
-    }
-
-    var reasonNode = byId("st-reason");
-    if (reasonNode) {
-      if (typeof data.reason === "string" && data.reason) {
-        reasonNode.textContent = "失败原因：" + data.reason;
-        reasonNode.hidden = false;
-      } else if (data.installed === false) {
-        reasonNode.textContent = "补丁未安装，但状态接口没有提供原因。";
-        reasonNode.hidden = false;
-      } else {
-        reasonNode.textContent = "";
-        reasonNode.hidden = true;
-      }
-    }
+  function buildGroup(group) {
+    var box = el("section", "mem-group"); var title = el("h3", "mem-group-title");
+    title.appendChild(document.createTextNode(group.name)); title.appendChild(el("span", "count", group.entries.length + " 条"));
+    box.appendChild(title);
+    var list = el("ul", "entries");
+    for (var i = 0; i < group.entries.length; i += 1) { list.appendChild(buildEntry(group.entries[i])); }
+    box.appendChild(list);
+    return box;
   }
-
-  function applyStateError(error) {
-    setBadge("状态未知", "warn");
-    var message = describeError(error);
-    if (message.indexOf("503") !== -1) {
-      addError("状态接口返回 503：插件已停用或补丁未安装（" + message + "）。");
-      return;
-    }
-    addError("读取补丁状态失败：" + message + "。");
+  function setMode(mode) {
+    memoryState.mode = mode;
+    var entriesTab = byId("tab-entries"); var rawTab = byId("tab-raw");
+    if (entriesTab) { entriesTab.className = "tab" + (mode === "entries" ? " active" : ""); entriesTab.setAttribute("aria-selected", mode === "entries" ? "true" : "false"); }
+    if (rawTab) { rawTab.className = "tab" + (mode === "raw" ? " active" : ""); rawTab.setAttribute("aria-selected", mode === "raw" ? "true" : "false"); }
+    show("mem-groups", mode === "entries" && !memoryState.empty);
+    show("mem-empty", mode === "entries" && memoryState.empty);
+    show("mem-raw", mode === "raw");
+    if (mode === "raw") { setText("mem-raw", memoryState.text ? memoryState.text : "（还没有内容）"); }
   }
-
-  function findEntry(files, name) {
-    var found = null;
-    files.forEach(function (entry) {
-      if (entry && typeof entry.name === "string" && entry.name.toUpperCase() === name) {
-        found = entry;
-      }
-    });
-    return found;
+  function renderMemoryGroups() {
+    memoryState.empty = false; memoryState.fallback = false;
+    var holder = byId("mem-groups"); clear(holder);
+    var parts = [];
+    for (var i = 0; i < memoryState.groups.length; i += 1) { var group = memoryState.groups[i]; parts.push(group.name + " " + group.entries.length); holder.appendChild(buildGroup(group)); }
+    var summary = memoryState.total + " 条";
+    if (parts.length) { summary += " · " + parts.join(" / "); }
+    if (memoryState.latest) { summary += " · 最近 " + memoryState.latest.slice(5); }
+    if (memoryState.truncated) { summary += " · 文件已截断"; }
+    setText("mem-summary", summary); show("mem-fallback", false); setMode("entries");
   }
-
-  function buildCard(name, entry) {
-    var card = document.createElement("div");
-    card.className = "file-card";
-    card.setAttribute("role", "button");
-    card.setAttribute("tabindex", "0");
-    card.setAttribute("aria-pressed", "false");
-    card.setAttribute("data-file", name);
-
-    var title = document.createElement("h3");
-    title.textContent = FILE_LABELS[name];
-
-    var role = document.createElement("p");
-    role.className = "file-subtitle";
-    role.textContent = FILE_ROLES[name];
-
-    var meta = document.createElement("p");
-    meta.className = "file-meta";
-    if (entry && entry.exists) {
-      meta.textContent = formatChars(entry.chars) + " · " + formatTime(entry.mtime);
-    } else {
-      meta.textContent = "未创建，插件加载时会播种";
-      card.className = card.className + " missing";
-    }
-
-    card.appendChild(title);
-    card.appendChild(role);
-    card.appendChild(meta);
-    card.addEventListener("click", function () {
-      selectFile(name);
-    });
-    card.addEventListener("keydown", function (event) {
-      if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
-        event.preventDefault();
-        selectFile(name);
-      }
-    });
-    return card;
+  function renderMemoryEmpty(message) {
+    memoryState.empty = true; memoryState.groups = []; memoryState.total = 0;
+    clear(byId("mem-groups")); setText("mem-summary", "0 条"); setText("mem-empty", message);
+    show("mem-fallback", false); setMode("entries");
   }
-
-  function markSelected(name) {
-    var cards = document.querySelectorAll(".file-card");
-    for (var index = 0; index < cards.length; index += 1) {
-      var card = cards[index];
-      card.setAttribute("aria-pressed", card.getAttribute("data-file") === name ? "true" : "false");
+  function renderMemoryFallback() {
+    memoryState.empty = false; memoryState.fallback = true; clear(byId("mem-groups"));
+    setText("mem-summary", "已按原文显示");
+    setText("mem-fallback", "这份文件不是标准格式，先按原文显示；上面能看到原文内容。");
+    show("mem-fallback", true); setMode("raw");
+  }
+  function renderMemoryData(data) {
+    memoryState.loaded = true;
+    if (!data || typeof data !== "object") { renderMemoryEmpty("接口返回了无法识别的数据，请到插件页重载后再看。"); return; }
+    memoryState.meta = data; memoryState.truncated = data.truncated === true;
+    var text = typeof data.content === "string" ? data.content : "";
+    memoryState.text = text;
+    if (data.exists === false) { renderMemoryEmpty("MEMORY.md 还没创建：插件加载时会播种，也可以直接编辑共享根里的文件。"); return; }
+    if (!text.trim()) { renderMemoryEmpty("MEMORY.md 还是空的。在群里对它说「记住：周五是小明的生日」，它就会写进这里。"); return; }
+    var parsed = parseMemory(text);
+    memoryState.groups = parsed.groups; memoryState.total = parsed.total; memoryState.latest = parsed.latest;
+    if (parsed.total > 0) { renderMemoryGroups(); } else { renderMemoryFallback(); }
+  }
+  function renderMemoryError(error) { var message = describeError(error); addError("读取 MEMORY.md 失败：" + message + "。"); setText("mem-summary", "读取失败"); renderMemoryEmpty("暂时读不到 MEMORY.md：详见页面顶部的红色提示。"); }
+  function renderSoulData(data) {
+    var body = byId("soul-body"); clear(body);
+    var text = data && typeof data.content === "string" ? data.content : "";
+    if (data && data.exists === false) { body.appendChild(el("p", "empty", "SOUL.md 还没创建：插件加载时会播种，也可以直接编辑共享根里的文件。")); return; }
+    if (!text.trim()) { body.appendChild(el("p", "empty", "SOUL.md 还是空的。让它自我介绍，或直接编辑这个文件。")); return; }
+    renderRich(body, text);
+  }
+  function renderRich(container, text) {
+    var lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+    var list = null; var ordered = null;
+    function closeLists() { list = null; ordered = null; }
+    for (var i = 0; i < lines.length; i += 1) {
+      var line = lines[i]; var trimmed = line.trim();
+      if (!trimmed) { closeLists(); continue; }
+      if (/^#\s+/.test(trimmed)) { closeLists(); container.appendChild(el("h3", "rich-h", trimmed.replace(/^#\s+/, ""))); continue; }
+      if (/^##\s+/.test(trimmed)) { closeLists(); container.appendChild(el("h4", "rich-h", trimmed.replace(/^##\s+/, ""))); continue; }
+      if (/^###+\s+/.test(trimmed)) { closeLists(); container.appendChild(el("h5", "rich-h", trimmed.replace(/^#+\s+/, ""))); continue; }
+      if (/^>\s?/.test(trimmed)) { closeLists(); var quote = el("p", "rich-quote"); quote.appendChild(inlineNodes(trimmed.replace(/^>\s?/, ""))); container.appendChild(quote); continue; }
+      var bullet = trimmed.match(/^[-*+]\s+(.*)$/);
+      if (bullet) { ordered = null; if (!list) { list = el("ul", "rich-list"); container.appendChild(list); } var item = el("li"); item.appendChild(inlineNodes(bullet[1])); list.appendChild(item); continue; }
+      var numbered = trimmed.match(/^\d+[.)]\s+(.*)$/);
+      if (numbered) { list = null; if (!ordered) { ordered = el("ol", "rich-list"); container.appendChild(ordered); } var orderedItem = el("li"); orderedItem.appendChild(inlineNodes(numbered[1])); ordered.appendChild(orderedItem); continue; }
+      closeLists(); var paragraph = el("p", "rich-p"); paragraph.appendChild(inlineNodes(trimmed)); container.appendChild(paragraph);
     }
   }
-
-  function buildCards(files) {
-    var holder = byId("cards");
-    if (!holder) {
-      return;
-    }
-    while (holder.firstChild) {
-      holder.removeChild(holder.firstChild);
-    }
-    FILE_ORDER.forEach(function (name) {
-      holder.appendChild(buildCard(name, findEntry(files, name)));
-    });
+  function renderSoulError(error) { var body = byId("soul-body"); clear(body); body.appendChild(el("p", "empty", "读取 SOUL.md 失败：" + describeError(error) + "。详见页面顶部的红色提示。")); addError("读取 SOUL.md 失败：" + describeError(error) + "。"); }
+  function renderMaintenance(data) {
+    if (!data || typeof data !== "object") { return; }
+    setText("mx-root", data.shared_root || "未知");
+    var disk = data.disk;
+    if (disk && typeof disk === "object") { var parts = []; parts.push(disk.exists === false ? "共享根不存在" : ((typeof disk.files === "number" ? disk.files : 0) + " 个文件")); if (typeof disk.size_mb === "number") { parts.push(disk.size_mb + " MB"); } setText("mx-disk", parts.join(" / ")); }
+    var memory = data.memory && typeof data.memory === "object" ? data.memory : {};
+    if (memory.soul_budget_chars || memory.memory_budget_chars) { setText("mx-budget", "SOUL ≤ " + (memory.soul_budget_chars || "?") + " 字符 · MEMORY ≤ " + (memory.memory_budget_chars || "?") + " 字符"); }
+    if (typeof memory.soft_limit_chars === "number") { setText("mx-soft", fmtCount(memory.soft_limit_chars) + " 字符"); }
+    setText("mx-installed", data.installed_at ? fmtWhen(data.installed_at) : "未知");
   }
-
-  function renderMemory(files) {
-    var entry = findEntry(files, "MEMORY");
-    var fill = byId("mem-fill");
-    var text = byId("mem-text");
-    if (!entry) {
-      if (fill) {
-        fill.style.width = "0%";
-        fill.className = "fill";
-      }
-      if (text) {
-        text.textContent = "MEMORY.md 未创建（插件加载时会播种，当前没有可显示的容量）。";
-        text.className = "mem-text";
-      }
-      return;
-    }
-
-    var chars = typeof entry.chars === "number" && isFinite(entry.chars) ? entry.chars : 0;
-    var isOver = chars > softLimit;
-    var ratio = softLimit > 0 ? chars / softLimit : 0;
-    var percentText = Math.round(ratio * 100);
-    var barPercent = Math.max(0, Math.min(100, percentText));
-    if (fill) {
-      fill.style.width = barPercent + "%";
-      fill.className = isOver ? "fill over" : "fill";
-    }
-    if (text) {
-      var label = "MEMORY.md 当前 " + formatChars(chars) + "，软上限 " + formatChars(softLimit) +
-        "（" + formatPercent(percentText) + "）。";
-      if (isOver) {
-        label += "已超过软上限：请合并重复与过期条目，并把历史条目剪切到 memory/archive/MEMORY-YYYYMM.md。";
-      }
-      text.textContent = label;
-      text.className = isOver ? "mem-text over" : "mem-text";
-    }
+  function renderManaged(list) {
+    var text = "未检测"; var extra = findEntry(list, "EXTRA");
+    if (extra && typeof extra.managed_ok === "boolean") { text = extra.managed_ok ? "正常（标记对完整）" : "异常（未自动重写，请检查 astral:managed 标记）"; }
+    else if (stateData && stateData.memory && stateData.memory.managed) { text = MANAGED_LABELS[stateData.memory.managed] || ("状态：" + stateData.memory.managed); }
+    var node = byId("mx-managed"); node.textContent = text; node.className = /异常/.test(text) ? "danger-text" : "";
   }
-
-  function renderArchive(archive) {
-    var node = byId("archive-text");
-    if (!node) {
-      return;
-    }
-    if (!archive || typeof archive !== "object") {
-      node.textContent = "归档：未提供";
-      return;
-    }
+  function renderArchive(data) {
+    var archive = data && data.archive ? data.archive : null;
+    if (!archive) { setText("mx-archive", "—"); return; }
     var count = typeof archive.count === "number" ? archive.count : 0;
-    var names = Array.isArray(archive.names) ? archive.names : [];
-    var dir = typeof archive.dir === "string" && archive.dir ? archive.dir : "memory/archive";
-    if (!count) {
-      node.textContent = "归档：" + dir + " 下暂无归档文件。";
-      return;
-    }
-    var shown = names.slice(0, 10).join("、");
-    node.textContent = "归档：" + dir + " 下 " + count + " 个文件" + (shown ? "（" + shown + "）" : "") + "。";
+    if (!count) { setText("mx-archive", "暂无归档"); return; }
+    var names = Array.isArray(archive.names) ? archive.names.slice(0, 3) : [];
+    var suffix = names.length ? "（" + names.join("、") + (count > names.length ? " 等" : "") + "）" : "";
+    setText("mx-archive", count + " 个文件" + suffix);
   }
-
-  var MANAGED_LABELS = {
-    created: "正常（已创建托管区段）",
-    updated: "正常（已同步到当前版本）",
-    unchanged: "正常（内容已是最新）",
-    appended: "正常（已追加托管区段）",
-    broken: "异常（标记重复、嵌套或顺序颠倒，未自动重写）",
-    missing_root: "未检测（共享根不存在）",
-    unknown: "未检测"
-  };
-
-  function renderManaged() {
-    var node = byId("st-managed");
-    if (!node) {
-      return;
-    }
-    if (filesManaged === true) {
-      node.textContent = "正常（标记对完整）";
-      return;
-    }
-    if (filesManaged === false) {
-      node.textContent = "异常（未自动重写，请检查 astral:managed 标记）";
-      return;
-    }
-    if (stateManaged) {
-      node.textContent = MANAGED_LABELS[stateManaged] || "状态：" + stateManaged;
-      return;
-    }
-    node.textContent = "未检测";
+  function applyState(data) {
+    stateData = data && typeof data === "object" ? data : {};
+    var badge = byId("st-badge"); var installed = stateData.installed === true;
+    if (installed) { badge.textContent = "已生效"; badge.className = "badge ok"; }
+    else if (stateData.installed === false) { badge.textContent = "未生效"; badge.className = "badge bad"; }
+    else { badge.textContent = "状态未知"; badge.className = "badge warn"; }
+    var memory = stateData.memory && typeof stateData.memory === "object" ? stateData.memory : {};
+    var inject = byId("st-inject");
+    if (memory.enabled === false) { inject.textContent = "记忆注入：已关闭"; inject.className = "st-danger"; }
+    else if (memory.enabled === true) { inject.textContent = "记忆注入：开启"; inject.className = ""; }
+    else { inject.textContent = "记忆注入：—"; inject.className = ""; }
+    renderWarnings(Array.isArray(stateData.warnings) ? stateData.warnings : []);
+    if (stateData.installed === false) { showUnavailable(stateData.reason || stateData.message || "插件未生效"); }
+    renderMaintenance(stateData);
   }
-
+  function showUnavailable(message) { var node = byId("st-action"); node.textContent = "未生效：" + (message || "原因未知") + "。在插件页重载插件；仍失败发 /astral status 看原因。"; node.hidden = false; }
+  function applyStateError(error) {
+    stateData = null; var badge = byId("st-badge"); badge.textContent = "未生效"; badge.className = "badge bad";
+    var inject = byId("st-inject"); inject.textContent = "记忆注入：—"; inject.className = "";
+    renderWarnings([]); showUnavailable(describeError(error));
+  }
   function applyFiles(data) {
-    if (!data || typeof data !== "object") {
-      addError("文件清单接口返回了无法识别的数据。");
-      return;
-    }
-    if (typeof data.shared_root === "string" && data.shared_root) {
-      filesRoot = data.shared_root;
-    }
-    applyMemoryLimit(data.memory_soft_limit);
-    renderRoot();
-
-    var files = Array.isArray(data.files) ? data.files : [];
-    if (!files.length) {
-      addError("文件清单为空：共享根下没有可显示的四个文件。");
-    }
-    buildCards(files);
-    renderMemory(files);
-    renderArchive(data.archive);
-    var extraEntry = findEntry(files, "EXTRA");
-    if (extraEntry && typeof extraEntry.managed_ok === "boolean") {
-      filesManaged = extraEntry.managed_ok;
-    }
-    renderManaged();
-
-    var initial = findEntry(files, "SOUL") || files[0] || null;
-    if (initial && typeof initial.name === "string") {
-      selectFile(initial.name.toUpperCase());
-    } else {
-      setText("preview-meta", "没有可预览的文件。");
-    }
+    filesData = data && typeof data === "object" ? data : {};
+    var list = Array.isArray(filesData.files) ? filesData.files : [];
+    var soft = filesData.memory_soft_limit;
+    if (typeof soft === "number") { setText("mx-soft", fmtCount(soft) + " 字符"); }
+    renderArchive(filesData); renderManaged(list);
+    var memoryMeta = findEntry(list, "MEMORY");
+    if (memoryMeta && memoryMeta.mtime) { setText("st-updated", "记忆更新于 " + fmtWhen(memoryMeta.mtime)); }
+    else if (memoryMeta) { setText("st-updated", "记忆更新时间：未知"); }
+    else { setText("st-updated", "记忆文件未创建"); }
+    if (!memoryMeta || memoryMeta.exists === false) { renderMemoryEmpty("MEMORY.md 还没创建：插件加载时会播种，也可以直接编辑共享根里的文件。"); }
+    else { fetchFile("MEMORY").then(renderMemoryData, renderMemoryError); }
+    var soulMeta = findEntry(list, "SOUL");
+    if (!soulMeta || soulMeta.exists === false) { var body = byId("soul-body"); clear(body); body.appendChild(el("p", "empty", "SOUL.md 还没创建：插件加载时会播种，也可以直接编辑共享根里的文件。")); }
+    else { fetchFile("SOUL").then(renderSoulData, renderSoulError); }
   }
-
-  function renderPreview(name, data) {
-    var label = FILE_LABELS[name] || name;
-    if (!data || typeof data !== "object") {
-      setText("preview-meta", label + "：接口返回了无法识别的数据。");
-      setText("preview", "接口返回了无法识别的数据。");
-      return;
-    }
-
-    var meta = [label];
-    if (typeof data.abs_path === "string" && data.abs_path) {
-      meta.push(data.abs_path);
-    }
-    if (typeof data.chars === "number") {
-      meta.push(formatChars(data.chars));
-    }
-    if (data.mtime) {
-      meta.push("更新于 " + formatTime(data.mtime));
-    }
-    if (typeof data.encoding === "string" && data.encoding) {
-      meta.push("编码 " + data.encoding);
-    }
-    if (data.truncated === true) {
-      meta.push("文件超过 512 KB，仅显示前 512 KB");
-    }
-    setText("preview-meta", meta.join(" · "));
-
-    var previewNode = byId("preview");
-    if (!previewNode) {
-      return;
-    }
-    if (data.exists === false) {
-      var absPath = typeof data.abs_path === "string" ? data.abs_path : "共享根下";
-      previewNode.textContent = "（" + label + " 不存在：" + absPath + "；插件加载时会播种）";
-      return;
-    }
-    if (typeof data.content !== "string") {
-      previewNode.textContent = "（接口没有返回正文）";
-      return;
-    }
-    previewNode.textContent = data.content === "" ? "（空文件）" : data.content;
+  function applyFilesError(error) {
+    var message = describeError(error);
+    addError("读取文件清单失败：" + message + "。");
+    setText("st-updated", "记忆更新时间：—"); setText("mem-summary", "文件清单读取失败");
+    renderMemoryEmpty("暂时读不到文件清单。确认插件已启用后在插件页重载；仍失败发 /astral status 看原因。");
   }
-
-  function selectFile(name) {
-    selectedName = name;
-    markSelected(name);
-    setText("preview-meta", "正在读取 " + (FILE_LABELS[name] || name) + " …");
-    setText("preview", "");
-    requestFile(name).then(function (data) {
-      if (selectedName !== name) {
-        return;
-      }
-      renderPreview(name, data);
+  function closeOther() { otherOpen = ""; var rows = document.querySelectorAll(".filerow"); for (var i = 0; i < rows.length; i += 1) { rows[i].setAttribute("aria-expanded", "false"); } show("other-raw", false); show("other-meta", false); }
+  function toggleOther(name) {
+    if (otherOpen === name) { closeOther(); return; }
+    otherOpen = name;
+    var rows = document.querySelectorAll(".filerow");
+    for (var i = 0; i < rows.length; i += 1) { rows[i].setAttribute("aria-expanded", rows[i].getAttribute("data-file") === name ? "true" : "false"); }
+    setText("other-meta", "正在读取 " + name + " …"); show("other-meta", true); setText("other-raw", "加载中…"); show("other-raw", true);
+    fetchFile(name).then(function (data) {
+      if (otherOpen !== name) { return; }
+      var label = name === "AGENTS" ? "AGENTS.md" : "EXTRA_PROMPT.md";
+      var meta = [label];
+      if (data && typeof data.chars === "number") { meta.push(fmtCount(data.chars) + " 字符"); }
+      if (data && data.mtime) { meta.push("更新于 " + fmtWhen(data.mtime)); }
+      if (data && data.truncated === true) { meta.push("文件过大，仅显示前 512 KB"); }
+      setText("other-meta", meta.join(" · "));
+      var content = data && typeof data.content === "string" ? data.content : "";
+      setText("other-raw", content || "（空文件）");
     }, function (error) {
-      if (selectedName !== name) {
-        return;
-      }
-      addError("读取 " + (FILE_LABELS[name] || name) + " 失败：" + describeError(error) + "。");
-      setText("preview-meta", (FILE_LABELS[name] || name) + " 读取失败");
-      setText("preview", "读取失败，详见页面顶部的红色提示条。");
+      if (otherOpen !== name) { return; }
+      var message = describeError(error);
+      setText("other-meta", "读取失败：" + message); setText("other-raw", "读取失败，详见页面顶部的红色提示。");
+      addError("读取 " + name + " 失败：" + message + "。");
     });
   }
-
-  function loadData() {
-    requestState().then(applyState, applyStateError);
-    requestFileList().then(applyFiles, function (error) {
-      addError("读取文件清单失败：" + describeError(error) + "。");
-      setText("preview-meta", "文件清单读取失败，详见页面顶部的红色提示条。");
-    });
+  function setupOtherFiles() { var rows = document.querySelectorAll(".filerow"); for (var i = 0; i < rows.length; i += 1) { (function (row) { row.addEventListener("click", function () { toggleOther(row.getAttribute("data-file")); }); row.addEventListener("keydown", function (event) { if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") { event.preventDefault(); toggleOther(row.getAttribute("data-file")); } }); })(rows[i]); } }
+  function setupTabs() {
+    var tabs = document.querySelectorAll(".tab");
+    for (var i = 0; i < tabs.length; i += 1) {
+      (function (tab) {
+        function activate() { setMode(tab.getAttribute("data-mode")); }
+        tab.addEventListener("click", activate);
+        tab.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") { event.preventDefault(); activate(); return; }
+          if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); var next = tab.getAttribute("data-mode") === "entries" ? "raw" : "entries"; setMode(next); var target = byId(next === "entries" ? "tab-entries" : "tab-raw"); if (target) { target.focus(); } }
+        });
+      })(tabs[i]);
+    }
   }
-
-  function start() {
-    if (!bridge || typeof bridge.apiGet !== "function") {
-      showNotice("请在 AstrBot WebUI 的插件页中打开：本页依赖插件页通信组件才能读取状态与文件。");
-      setBadge("不可用", "warn");
-      setText("st-root", "不可用");
-      setText("st-managed", "不可用");
-      setText("st-consumers", "不可用");
-      setText("st-runtime", "不可用");
-      setText("st-baseline", "不可用");
-      setText("st-disk", "不可用");
-      setText("st-quota", "不可用");
-      setText("mem-text", "页面未连接 AstrBot WebUI，无法读取容量。");
-      setText("preview-meta", "页面未连接 AstrBot WebUI。");
-      setText("preview", "请在 AstrBot WebUI 的插件页中打开。");
-      return;
-    }
-
-    var ready = null;
-    try {
-      ready = typeof bridge.ready === "function" ? bridge.ready() : null;
-    } catch (error) {
-      ready = null;
-    }
-
-    var contextTimer = window.setTimeout(function () {
-      showNotice("还没有收到 AstrBot WebUI 的页面上下文：请在 AstrBot WebUI 的插件页中打开本页。");
-    }, CONTEXT_TIMEOUT_MS);
-
-    if (ready && typeof ready.then === "function") {
-      ready.then(function () {
-        window.clearTimeout(contextTimer);
-      }, function (error) {
-        window.clearTimeout(contextTimer);
-        addError("插件页上下文初始化失败：" + describeError(error) + "。");
-      });
-    } else {
-      window.clearTimeout(contextTimer);
-    }
-
-    loadData();
+  function renderOffline() {
+    showNotice("请在 AstrBot WebUI 的插件页中打开：本页依赖插件页通信组件才能读取记忆。");
+    var badge = byId("st-badge"); badge.textContent = "不可用"; badge.className = "badge warn";
+    setText("st-inject", "记忆注入：—"); setText("st-updated", "记忆更新时间：—"); setText("mem-summary", "页面未连接 AstrBot WebUI");
+    renderMemoryEmpty("请在 AstrBot WebUI 的插件页中打开。");
+    var body = byId("soul-body"); clear(body); body.appendChild(el("p", "empty", "页面未连接 AstrBot WebUI。"));
+    var rows = document.querySelectorAll(".filerow"); for (var i = 0; i < rows.length; i += 1) { rows[i].setAttribute("aria-disabled", "true"); }
   }
-
+  function loadAll() { fetchState().then(applyState, applyStateError); fetchFiles().then(applyFiles, applyFilesError); }
   function boot() {
-    try {
-      start();
-    } catch (error) {
-      addError("页面初始化失败：" + describeError(error) + "。");
-    }
+    setupTabs(); setupOtherFiles();
+    if (!bridge || typeof bridge.apiGet !== "function") { renderOffline(); return; }
+    var contextTimer = window.setTimeout(function () { showNotice("还没有收到 AstrBot WebUI 的页面上下文：请在 AstrBot WebUI 的插件页中打开本页。"); }, CONTEXT_TIMEOUT_MS);
+    var readyPromise = null;
+    try { readyPromise = bridge.ready(); } catch (error) { readyPromise = null; }
+    if (readyPromise && typeof readyPromise.then === "function") { readyPromise.then(function () { window.clearTimeout(contextTimer); }, function () { window.clearTimeout(contextTimer); }); }
+    else { window.clearTimeout(contextTimer); }
+    loadAll();
   }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot);
-  } else {
-    boot();
-  }
+  if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", boot); }
+  else { boot(); }
 })();
 </script>
 </body>

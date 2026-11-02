@@ -193,8 +193,21 @@ def test_readme_has_no_placeholders_or_template_remnants() -> None:
 
 def test_changelog_records_scope_and_verification() -> None:
     changelog = _read(CHANGELOG)
-    for phrase in ("v0.1.0", "pytest", "19 passed", "73", "已知限制"):
+    for phrase in ("v1.0.0", "v0.1.0", "pytest", "19 passed", "已知限制", "运行时"):
         assert phrase in changelog, f"CHANGELOG is missing: {phrase}"
+    # internal-only verification notes do not belong in a published changelog
+    assert "未随仓库发布" not in changelog
+
+
+def test_page_is_memory_first() -> None:
+    html = _html()
+    assert "它现在记得" in html
+    assert "它的人设" in html
+    # the memory card comes before the maintenance fold
+    assert html.index("它现在记得") < html.index("运行与维护")
+    # patch internals are not page furniture anymore
+    assert "基线" not in html
+    assert "版本基线" not in html
 
 
 def test_views_and_docs_contain_no_template_plugin_name() -> None:

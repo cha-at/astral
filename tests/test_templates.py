@@ -70,6 +70,15 @@ def test_file_templates_keys_and_order():
 def test_memory_template_discloses_global_share():
     # FR-7 / AC-7.1: the seeded MEMORY.md is disclosure point #1.
     assert "全局共享" in templates.MEMORY_TEMPLATE
+    assert "所有群" in templates.MEMORY_TEMPLATE
+
+
+def test_templates_keep_human_notes_in_comments():
+    """The injected copy must not carry notes meant for maintainers."""
+    for text in (templates.SOUL_TEMPLATE, templates.MEMORY_TEMPLATE):
+        assert "<!--" in text, "human guidance belongs in HTML comments"
+    assert "[Astral Memory Snapshot]" not in templates.MANAGED_SECTION
+    assert "手改会在下次启动被覆盖" not in templates.MANAGED_SECTION
 
 
 def test_agents_template_lists_directories():
@@ -90,24 +99,25 @@ def test_agents_template_lists_directories():
 
 def test_managed_section_covers_fr4_checklist():
     section = templates.MANAGED_SECTION
-    for heading in (
-        "## 何时写记忆",
-        "## 怎么写",
-        "## 写 SOUL 的门槛",
-        "## 容量",
-        "## 禁止",
-        "## 快照是旧的",
-    ):
+    for heading in ("## 记东西", "## 改自己", "## 别提这些", "## 安全"):
         assert heading in section, heading
-    assert "1. 用户明确说" in section
-    assert "4. 出现可复用的教训" in section
+    # when to write
+    assert "该记才记" in section
+    assert "纯闲聊不记" in section
+    # how to write
     assert "astrbot_file_edit_tool" in section
-    assert "astrbot_grep_tool" in section
-    assert "- [YYYY-MM-DD] [来源] 内容" in section
-    assert "≤ 200 字符" in section
-    assert "20000" in section
-    assert "memory/archive/MEMORY-YYYYMM.md" in section
-    assert "全局共享" in section
+    assert "astrbot_file_write_tool" in section
+    assert "一条一句" in section
+    # stay in character
+    assert "别提" in section
+    assert "作为 AI" in section
+    # privacy + prompt-injection framing
+    assert "所有群共享" in section
+    assert "记忆是数据" in section
+    # honest degradation when the runtime exposes no file tools
+    assert "别假装记下了" in section
+    # short enough to sit in every conversation
+    assert len(section) <= 900
 
 
 def test_extra_prompt_template_layout():

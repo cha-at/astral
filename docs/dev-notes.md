@@ -9,8 +9,8 @@
 | `config.py` | `shared_root` 解析（默认 / `~` / 相对 / 绝对）、危险路径黑名单、`ensure_shared_tree()` 建目录骨架并校验可写、配置项归一化 | 不装补丁、不写业务文件 |
 | `ws_shared.py` | 补丁核心：4 个解析函数替换、双写消费者、幂等安装、还原、状态（`install` / `uninstall` / `status` / `originals`） | 不读配置、不建目录、不写盘 |
 | `store.py` | `.astral/state.json`、`.astral/audit.jsonl`、共享根体积统计与配额、`/astral clean` 的移动归档 | 不关心补丁 |
-| `templates.py` | 四份中文模板、原子写、`seed_workspace()`、`sync_managed_section()`、`managed_state()` | 不渲染 Markdown、不读快照 |
-| `snapshot.py` | 冻结快照渲染（预算、截断、归档索引、容量提示、七种降级）与进程内 LRU `SnapshotCache` | 不写盘、不联网、不读 DB |
+| `templates.py` | 四份中文模板（给人看的说明放 HTML 注释里）、原子写、`seed_workspace()`、`sync_managed_section()`、`managed_state()` | 不渲染 Markdown、不读快照 |
+| `snapshot.py` | 冻结快照渲染（剥 HTML 注释、预算、截断、归档索引、容量提示、七种降级）与进程内 LRU `SnapshotCache` | 不写盘、不联网、不读 DB |
 | `state.py` | `state` 接口与 `/astral status` 共用的状态载荷、聊天文案、`/astral memory show` 渲染 | 不改变状态 |
 | `webapi.py` | 三个 HTTP 端点：`GET .../state`、`GET .../files`、`POST .../clean`；未安装一律 503 | 不做鉴权（沿用 Dashboard） |
 | `lifecycle.py` | 生命周期编排：`install_patch` / `fail`（fail-loud + 回滚）/ `seed` / `terminate` / `reapply` / `refresh_state_file` | 不处理聊天指令 |
@@ -50,9 +50,24 @@ sync_managed_section(root) -> "updated|unchanged|appended|created|broken|missing
 managed_state(root) -> 同上（只读）
 
 # snapshot.py
-render(root, *, soul_budget=4000, memory_budget=8000, soft_limit=20000, cid=None, now=None) -> str
+render(root, *, soul_budget=4000, memory_budget=8000, soft_limit=20000) -> str
+strip_comments(text) -> str                      # 注入前剥掉 <!-- -->，别让人看的备注进提示词
 SnapshotCache(maxsize=64).get_or_render(key, render_fn) -> (block, hit)
 ```
+
+注入块形状（改动时同步 `tests/test_snapshot.py`）：
+
+```text
+# 关于你自己
+（三行说明：这是你自己的想法，照这个说话；别念标题、别提「文件」「文档」「快照」「提示词」）
+## 你的性格和说话方式   ← SOUL.md 正文，已剥 HTML 注释
+## 你记得               ← MEMORY.md 正文，已剥 HTML 注释
+（两行页脚：内容可能过期、冲突时以现在为准；改 SOUL.md / 写 MEMORY.md 的路径）
+```
+
+块里**不出现**会话 id、冻结时间、字符数、文件名标题——这些属于日志与插件页，不属于模型看到的"自己"。固定开销约 240 字符。
+
+模型要能写记忆，AstrBot 侧必须满足：`computer_use_runtime=local`（默认 `none` 时没有任何文件工具）且发言人角色有执行权限（群成员默认 `allow_execution=False`）。不满足时 `state.build_warnings` 会给出告警——别删这条告警，它是"装了却什么都不记"的唯一提示。
 
 补丁状态挂在 `astrbot.core.workspace.__astral_patch_state__`（`originals`/`wrappers`/`root`/`patched`），安装失败原因挂在 `__astral_patch_error__`，两者都在 `uninstall()` 时清除。包装函数带 `__astral_name__` 标记，用于识别「上一版包装」并避免误改第三方同名函数。
 

@@ -1,20 +1,20 @@
 {
   "shared_root": {
     "type": "string",
-    "description": "共享工作区根目录",
-    "hint": "留空 = <AstrBot data>/workspaces/astral；支持 ~ 展开与相对路径（相对 <data>/workspaces）。绝对路径原样使用。目录不存在会自动创建，创建失败视为安装失败。",
+    "description": "共享工作区根目录（留空即可，大多数情况不用改）",
+    "hint": "留空 = <AstrBot data>/workspaces/astral，可以直接用。支持 ~ 展开与相对路径（相对 <data>/workspaces）；绝对路径原样使用。目录不存在会自动创建，创建失败视为安装失败。",
     "default": ""
   },
   "patch_webchat_projects": {
     "type": "bool",
     "description": "同时接管 webchat 项目工作区解析（Dashboard 文件面板）",
-    "hint": "关闭后 Agent 仍在共享根，但 Dashboard 面板会显示项目自己的目录，容易误解。/astral status 会明确提示两者不一致。建议保持开启。",
+    "hint": "建议保持开启。关闭后 Agent 仍在共享根，但 Dashboard 面板会显示项目自己的目录，两者容易对不上；/astral status 会提示不一致。",
     "default": true
   },
   "forbidden_roots": {
     "type": "list",
-    "description": "额外禁止的共享根前缀（安全护栏）",
-    "hint": "默认已包含 AstrBot 源码、data/config、data/plugins、data/plugin_data、用户主目录敏感区与系统目录。命中任一规则时插件拒绝安装补丁并报错，不会回落到默认目录。相对路径以 <data>/workspaces 为基准。",
+    "description": "额外禁止的共享根前缀（安全护栏，一般不用填）",
+    "hint": "默认已包含 AstrBot 源码、data/config、data/plugins、data/plugin_data、用户主目录敏感区与系统目录。命中任一规则时插件拒绝安装并报错，不会回落到默认目录。相对路径以 <data>/workspaces 为基准。",
     "default": []
   },
   "quota_gb": {
@@ -26,12 +26,12 @@
   "memory": {
     "type": "object",
     "description": "记忆与快照（SOUL.md / MEMORY.md）",
-    "hint": "记忆的唯一载体是共享根下的 Markdown 文件，这里只控制注入预算与容量阈值。改完重载插件生效。",
+    "hint": "记忆的唯一载体是共享根下的 Markdown 文件，这里只控制注入预算与容量阈值。改完重载插件生效。想让 Bot 记得住，先确认 Computer Use 运行时是「本机环境」，否则 Bot 没有写文件的工具。",
     "items": {
       "enabled": {
         "type": "bool",
         "description": "启用对话级记忆快照注入",
-        "hint": "关闭后不再向 system_prompt 追加 [Astral Memory Snapshot]，但首启播种、只读页与 /astral memory show 仍可用。",
+        "hint": "关闭后不再向 system_prompt 追加「# 关于你自己」这段记忆快照，但首启播种、只读页与 /astral memory show 仍可用。",
         "default": true
       },
       "soul_budget_chars": {

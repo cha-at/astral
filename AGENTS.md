@@ -1,6 +1,6 @@
 # AGENTS.md — astrbot_plugin_astral
 
-本目录是 AstrBot 插件 **`astrbot_plugin_astral`**（展示名 Astral）的仓库根。
+本目录是 AstrBot 插件 **`astrbot_plugin_astral`**（展示名「Astral 记忆」）的仓库根。
 
 ## 先读什么
 
@@ -19,9 +19,10 @@
 
 ## 当前状态
 
-- v0.1.0 已实现：共享工作区补丁 + SOUL/MEMORY 文件式记忆。
+- v1.0.0 已实现：共享工作区补丁 + SOUL/MEMORY 文件式记忆；v1.0.0 重点是首启文案、注入块与插件页（记忆窗口），记忆写入仍依赖 AstrBot 的 Computer Use 运行时。
 - 模块地图：见 docs/dev-notes.md（config / ws_shared / store / templates / snapshot / state / webapi / lifecycle / main）。
-- 测试：`pytest tests -q` → 152 passed / 2 skipped；运行方式见 tests/README.md，必须把 `ASTRBOT_ROOT` 指向临时目录。
+- 测试：`pytest tests -q` → 157 passed / 2 skipped；运行方式见 tests/README.md，必须把 `ASTRBOT_ROOT` 指向临时目录。
+- 注入契约：`snapshot.py` 渲染 `# 关于你自己`，剥掉 HTML 注释，不带会话 id / 字符数 / 文件名标题；改它要同步 `tests/test_snapshot.py` 与 docs/dev-notes.md。
 - 未决：三平台 cwd 一致、WebUI 面板路径、备份恢复等需要真实多平台会话的人工验收。
 
 ## 提交约定

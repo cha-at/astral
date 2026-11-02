@@ -19,6 +19,7 @@ import pytest
 from starlette.datastructures import Headers, QueryParams
 
 import config
+import snapshot
 import ws_shared
 
 
@@ -179,9 +180,9 @@ def test_snapshot_hook_appends_and_freezes(plugin_factory):
         return req.system_prompt
 
     first = call(SimpleNamespace(system_prompt="", conversation=None))
-    assert first.startswith("\n[Astral Memory Snapshot]")
-    assert "### SOUL.md" in first and "### MEMORY.md" in first
-    assert "conv=no-conv" in first
+    assert first.startswith("\n" + snapshot.HEADER)
+    assert snapshot.SOUL_TITLE in first and snapshot.MEMORY_TITLE in first
+    assert "conv=" not in first and "frozen_at" not in first
 
     memory = shared / "MEMORY.md"
     memory.write_text(
@@ -190,16 +191,14 @@ def test_snapshot_hook_appends_and_freezes(plugin_factory):
         encoding="utf-8",
     )
     second = call(SimpleNamespace(system_prompt="base", conversation=None))
-    assert second.startswith("base\n[Astral Memory Snapshot]")
-    assert first.split("frozen_at=")[1].split("\n")[0] == second.split(
-        "frozen_at="
-    )[1].split("\n")[0]
+    assert second.startswith("base\n" + snapshot.HEADER)
+    # same conversation: the frozen block is byte-identical
+    assert second == "base" + first
     assert "冻结验证条目ZZZ" not in second
 
     third = call(
         SimpleNamespace(system_prompt="", conversation=SimpleNamespace(cid="conv-123456")),
     )
-    assert "conv=conv-123" in third
     assert "冻结验证条目ZZZ" in third
 
     plugin.options["memory"]["enabled"] = False
@@ -351,14 +350,24 @@ def test_status_text_and_warnings(plugin_factory):
     text = state_mod.status_text(payload)
     assert str(shared.resolve()) in text
     assert "已生效" in text
-    assert "consumers" in text
+    assert "记忆概况" in text
+    assert "/astral memory show" in text
     assert "全局共享" in text
+    # patch internals stay out of chat output
+    assert "consumers" not in text
+    assert "831abae85" not in text
     assert payload["warnings"] == []
 
     sandbox_plugin, _ = plugin_factory(runtime="sandbox")
     sandbox_payload = sandbox_plugin.state_payload()
     assert sandbox_payload["runtime"] == "sandbox"
     assert any("沙箱" in warning for warning in sandbox_payload["warnings"])
+
+    # the shipped default runtime is "none": no file tools, memory is read-only
+    none_plugin, _ = plugin_factory(runtime="none")
+    none_payload = none_plugin.state_payload()
+    assert any("本机环境" in warning for warning in none_payload["warnings"])
+    assert "写不进去" in state_mod.status_text(none_payload)
 
 
 def test_memory_show_private_vs_group(plugin_factory):
@@ -373,10 +382,10 @@ def test_memory_show_private_vs_group(plugin_factory):
 
     private_text = state_mod.memory_show_text(plugin, private_event, "memory")
     assert "MEMORY" in private_text
-    assert "群聊只显示元信息" not in private_text
+    assert "群聊里只显示" not in private_text
 
     group_text = state_mod.memory_show_text(plugin, group_event, "memory")
-    assert "群聊只显示元信息" in group_text
+    assert "群聊里只显示" in group_text
     assert "全局共享" in group_text
     assert "私聊" in group_text
 

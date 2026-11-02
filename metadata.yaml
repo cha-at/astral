@@ -1,8 +1,27 @@
 name: astrbot_plugin_astral
-display_name: Astral
-desc: 一个工作区、一份记忆：把全平台所有会话的 Agent 工作区指向同一个共享根，并用 SOUL.md / MEMORY.md 承载文件式自我认知与长期记忆
-short_desc: 全平台共享工作区 + 文件式长期记忆，可观测、可回滚
-version: 0.1.0
+display_name: Astral 记忆
+desc: |
+  装上之后，Bot 会记住群里的人和事：谁爱聊什么、约定过什么、上次说到哪儿——
+  换个群也不失忆，说话像同一个人。所有平台、所有群共用同一份记忆，
+  记忆就是几个 Markdown 文件，你随时能打开看、直接改。
+  只适配 AstrBot 4.29.x；其它版本在插件市场会显示"不支持"（补丁绑定了具体源码位置，这是故意的）。
+short_desc: 让 Bot 记住群里的人和事：所有群共用一份记忆，说话像同一个人
+version: 1.0.0
 author: ChakerAt
 repo: https://github.com/cha-at/astral
 astrbot_version: ">=4.29.4,<4.30"
+category: AI 增强
+tags:
+  - memory
+  - 长期记忆
+  - 角色扮演
+  - 人设
+  - 群聊
+support_platforms:
+  - aiocqhttp
+  - qq_official
+  - qq_official_webhook
+  - telegram
+  - lark
+  - discord
+  - webchat

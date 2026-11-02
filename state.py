@@ -8,6 +8,7 @@ and the shared root, then returns plain data or Chinese text.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -53,6 +54,93 @@ def is_group_message(event: Any) -> bool:
         return False
 
 
+def memory_summary(root: Path | None) -> dict[str, Any]:
+    """Cheap, read-only digest of SOUL.md / MEMORY.md for chat output.
+
+    Counts non-placeholder "- " lines under "## " sections, which works for the
+    seeded template and for hand-written memory alike.
+    """
+    summary: dict[str, Any] = {
+        "memory_exists": False,
+        "memory_entries": 0,
+        "memory_chars": 0,
+        "memory_mtime": None,
+        "soul_exists": False,
+        "soul_chars": 0,
+    }
+    if root is None or not root.is_dir():
+        return summary
+    for name, prefix in (("MEMORY.md", "memory"), ("SOUL.md", "soul")):
+        path = root / name
+        try:
+            if not path.is_file() or path.is_symlink():
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+            stat = path.stat()
+        except OSError:
+            continue
+        summary[f"{prefix}_exists"] = True
+        summary[f"{prefix}_chars"] = len(text)
+        if prefix == "memory":
+            summary["memory_mtime"] = stat.st_mtime
+            summary["memory_entries"] = _count_memory_entries(text)
+    return summary
+
+
+def _count_memory_entries(text: str) -> int:
+    count = 0
+    in_section = False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("## "):
+            in_section = True
+            continue
+        if not in_section or not line.startswith("- "):
+            continue
+        body = line[2:].strip()
+        if not body or body in ("（暂无）", "（还没有）"):
+            continue
+        count += 1
+    return count
+
+
+def _format_chars(chars: int) -> str:
+    if chars >= 1000:
+        return f"{chars / 1000:.1f}k 字"
+    return f"{chars} 字"
+
+
+def _format_short_time(timestamp: float | None) -> str:
+    if not timestamp:
+        return "未知时间"
+    return datetime.fromtimestamp(timestamp).astimezone().strftime("%m-%d %H:%M")
+
+
+def _memory_overview(summary: dict[str, Any]) -> str:
+    soul = (
+        _format_chars(int(summary.get("soul_chars") or 0))
+        if summary.get("soul_exists")
+        else "未创建"
+    )
+    if not summary.get("memory_exists"):
+        return f"SOUL {soul} / MEMORY 还没有（插件加载时会播种）"
+    entries = int(summary.get("memory_entries") or 0)
+    chars = _format_chars(int(summary.get("memory_chars") or 0))
+    updated = _format_short_time(summary.get("memory_mtime"))
+    if entries:
+        head = f"SOUL {soul} / MEMORY {entries} 条（{chars}）"
+    else:
+        head = f"SOUL {soul} / MEMORY 还是空的（{chars}）"
+    return f"{head}，最近 {updated} 更新"
+
+
+_CJK_RE = re.compile(r"[\u4e00-\u9fff]")
+
+
+def _has_cjk(text: str) -> bool:
+    return bool(_CJK_RE.search(text or ""))
+
+
 def build_warnings(plugin: Any, root: Path | None, status: dict[str, Any]) -> list[str]:
     """Collect actionable warnings for the state payload (001 FR-7 / FR-11)."""
     if not plugin.is_installed():
@@ -72,8 +160,17 @@ def build_warnings(plugin: Any, root: Path | None, status: dict[str, Any]) -> li
         )
     if root is None or not root.is_dir():
         warnings.append("共享根不存在或不是目录，请检查 shared_root 配置")
-    if plugin.runtime() == "sandbox":
-        warnings.append("当前为沙箱运行时，工作区不参与 Agent 执行")
+    runtime = plugin.runtime()
+    if runtime == "sandbox":
+        warnings.append(
+            "当前是沙箱运行时：Agent 在容器里干活，不读也不写这个共享根",
+        )
+    elif runtime != "local":
+        warnings.append(
+            "Computer Use 运行时不是「本机环境」：Bot 现在没有文件工具，"
+            "记忆只能读、写不进去。到 配置 → Agent → Computer Use 运行时 "
+            "改成本机环境，再重载插件",
+        )
     if root is not None:
         quota = store_mod.quota_state(root, plugin.options["quota_gb"])
         if quota["warn"]:
@@ -123,28 +220,44 @@ def build_state(plugin: Any) -> dict[str, Any]:
         },
         "quota": quota,
         "memory": dict(plugin.memory_options(), managed=plugin.managed_state()),
+        "memory_summary": memory_summary(root),
         "warnings": build_warnings(plugin, root, status),
     }
 
 
 def status_text(payload: dict[str, Any]) -> str:
-    """Render the human readable '/astral status' answer."""
-    consumers = payload.get("consumers") or {}
-    total = sum(len(modules) for modules in consumers.values())
-    baseline = payload.get("baseline") or {}
-    lines = [
-        "Astral 状态",
-        f"- 共享根：{payload.get('shared_root') or '（未知）'}",
-        f"- 安装状态：{'已生效' if payload.get('installed') else '未生效'}",
-        f"- consumers：{total} 个引用（覆盖 {len(consumers)} 个函数）",
-        f"- 运行时：{payload.get('runtime')}",
-        f"- 版本基线：AstrBot {baseline.get('astrbot')} @ {baseline.get('commit')}",
-    ]
-    if payload.get("reason"):
-        lines.append(f"- 失败原因：{payload['reason']}")
+    """Render the human readable '/astral status' answer.
+
+    Chat output carries only what a group member can act on: whether it works,
+    where the memory lives, how much it remembers and what to look at next.
+    Patch internals (consumers, baseline commit) stay in the state payload and
+    the plugin page.
+    """
+    root = payload.get("shared_root")
+    summary = payload.get("memory_summary") or {}
+    if payload.get("installed"):
+        lines = [
+            "Astral 已生效 ✅",
+            f"- 记忆目录：{root or '（未知）'}",
+            f"- 记忆概况：{_memory_overview(summary)}",
+            "- 看它记得什么：/astral memory show",
+            "- 全局共享：所有平台、所有群共用这一份，别写密钥和别人的隐私。",
+        ]
+    else:
+        reason = str(payload.get("reason") or "未知")
+        lines = ["Astral 未生效 ❌"]
+        if _has_cjk(reason):
+            lines.append(f"- 原因：{reason}")
+        else:
+            lines.append(
+                "- 结论：插件没装上。最常见的是 AstrBot 版本对不上，或共享根不可写。"
+            )
+            lines.append(f"- 原始信息：{reason}")
+        lines.append("- 下一步：重载插件后再发一次 /astral status；还是不行就看插件页的提示。")
+        if root:
+            lines.append(f"- 记忆目录：{root}")
     for warning in payload.get("warnings") or []:
         lines.append(f"- 注意：{warning}")
-    lines.append(f"- 隐私：{DISCLOSURE}")
     return "\n".join(lines)
 
 
@@ -171,14 +284,16 @@ def memory_show_text(plugin: Any, event: Any, target: str) -> str:
     except OSError:
         return f"{relative} 读取失败：{path}"
     header = (
-        f"{relative} —— {len(text)} 字符 / {stat.st_size} 字节 / "
+        f"{relative} —— {_format_chars(len(text))}，"
         f"更新于 {format_mtime(stat.st_mtime)}"
     )
+    if relative == "MEMORY.md":
+        header += f"，{_count_memory_entries(text)} 条记忆"
     if is_group_message(event):
         head = "\n".join(text.splitlines()[:3])
         return (
             f"{header}\n"
-            "群聊只显示元信息与前 3 行；完整内容请私聊 Bot 或到 WebUI 插件页查看。\n"
+            "群聊里只显示这些和前三行；要看全文请私聊我，或到 WebUI 插件页。\n"
             f"{DISCLOSURE}\n---\n{head}\n{SNAPSHOT_REFRESH_HINT}"
         )
     if len(text) > MEMORY_SHOW_PRIVATE_LIMIT:

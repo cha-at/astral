@@ -176,7 +176,6 @@ class AstralPlugin(Star):
                     soul_budget=options["soul_budget_chars"],
                     memory_budget=options["memory_budget_chars"],
                     soft_limit=options["soft_limit_chars"],
-                    cid=cid,
                 )
 
             block, hit = self._cache.get_or_render(f"{_umo}:{cid}", render)
@@ -204,10 +203,10 @@ class AstralPlugin(Star):
     async def astral(self, event: AstrMessageEvent):
         """Astral 指令组。"""
         yield event.plain_result(
-            "用法：\n"
-            "/astral status —— 查看共享根、安装状态与告警\n"
-            "/astral clean [天数] —— 把共享根下超期的散落文件移动到 archive/（默认 0 天）\n"
-            "/astral memory show [soul|memory|agents|extra] —— 只读查看文件",
+            "Astral · 让我记住群里的事\n"
+            "/astral status —— 我现在记了多少、有没有生效\n"
+            "/astral memory show [soul|memory|agents|extra] —— 看我的设定和记忆\n"
+            "/astral clean [天数] —— 把 N 天没动过的散落文件挪进 archive/（默认 30 天，只移动不删除）",
         )
 
     @astral.command("status")
@@ -217,17 +216,18 @@ class AstralPlugin(Star):
 
     @astral.command("clean")
     @filter.permission_type(filter.PermissionType.ADMIN)
-    async def astral_clean(self, event: AstrMessageEvent, days: float = 0.0):
+    async def astral_clean(self, event: AstrMessageEvent, days: float = 30.0):
         """把共享根下超期的散落文件移动到 archive/。"""
         if self._root is None:
             yield event.plain_result("Astral 未生效，无法清理。")
             return
         result = self.clean_archive(days)
         if not result.get("moved"):
-            yield event.plain_result(f"没有需要归档的文件（阈值 {days} 天）。")
+            yield event.plain_result(f"没有需要归档的文件（阈值 {days:g} 天）。")
             return
         yield event.plain_result(
-            f"已移动 {result['moved']} 个文件到 {result['dest']}（移动而非删除）。",
+            f"已把 {result['moved']} 个文件挪到 {result['dest']}（只移动不删除）。\n"
+            f"要还原就把那个目录里的文件拷回共享根。",
         )
 
     @astral.group("memory")
