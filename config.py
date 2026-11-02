@@ -5,7 +5,8 @@ Responsibilities (001 FR-1, FR-2, FR-8):
 * turn the raw 'shared_root' option into an absolute Path;
 * reject dangerous locations instead of silently falling back to a default;
 * create the shared workspace directory skeleton and verify it is writable;
-* normalise the remaining options (001 keys + the 002 'memory' group).
+* normalise the remaining options (001 keys plus the 'memory' and
+  'version_control' groups).
 
 The module never touches sys.modules and never installs the patch.
 """
@@ -35,6 +36,11 @@ MEMORY_DEFAULTS: dict[str, Any] = {
     "soul_budget_chars": 4000,
     "memory_budget_chars": 8000,
     "soft_limit_chars": 20000,
+}
+
+VERSION_CONTROL_DEFAULTS: dict[str, Any] = {
+    "enabled": True,
+    "git_path": "",
 }
 
 PROBE_NAME = ".astral/.write-probe"
@@ -320,6 +326,26 @@ def memory_options(cfg: Any) -> dict[str, Any]:
     }
 
 
+def version_control_options(cfg: Any) -> dict[str, Any]:
+    """Return the normalised version_control option group (unreleased).
+
+    Coercion is deliberately tolerant: a malformed section must never make the
+    plugin unloadable, so every value falls back to VERSION_CONTROL_DEFAULTS.
+    """
+    raw = cfg.get("version_control") if isinstance(cfg, dict) else None
+    group = raw if isinstance(raw, dict) else {}
+    return {
+        "enabled": _as_bool(
+            group.get("enabled"),
+            VERSION_CONTROL_DEFAULTS["enabled"],
+        ),
+        "git_path": _as_str(
+            group.get("git_path"),
+            VERSION_CONTROL_DEFAULTS["git_path"],
+        ),
+    }
+
+
 def read_options(cfg: Any) -> dict[str, Any]:
     """Return every plugin option, normalised and defaulted."""
     conf = cfg if isinstance(cfg, dict) else {}
@@ -332,4 +358,5 @@ def read_options(cfg: Any) -> dict[str, Any]:
         "forbidden_roots": _as_list(conf.get("forbidden_roots")),
         "quota_gb": max(_as_float(conf.get("quota_gb"), 0.0), 0.0),
         "memory": memory_options(conf),
+        "version_control": version_control_options(conf),
     }

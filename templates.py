@@ -104,6 +104,7 @@ Astral 的共享工作区根目录。所有平台（QQ/Telegram/WebChat…）、
 | `memory/archive/` | 记忆归档，`MEMORY-YYYYMM.md` |
 | `archive/` | 其他归档 |
 | `.astral/` | Astral 自用状态，不要手改 |
+| `.git/` | 本地版本历史（Git 可用时存在；只跟踪四份内容文件），由 `/astral commit` 管理，不要手改 |
 
 ## 想改 bot 的样子
 - 改「名字、性格、说话方式」→ 编辑 `SOUL.md`（里面有现成的示例，照着改）。
@@ -114,6 +115,7 @@ Astral 的共享工作区根目录。所有平台（QQ/Telegram/WebChat…）、
 ## 约定
 - 交付物优先放 `shared/`；临时文件放 `archive/` 或删掉。
 - 不要提交 `.astral/` 下的内容。
+- 版本历史用 `/astral commit` 保存、`/astral recover` 回退；不要手动 `git reset`。
 - 不确定文件该放哪就问用户。
 """
 
@@ -180,6 +182,11 @@ def atomic_write_text(path: Path, text: str) -> None:
     left untouched.
     """
     _atomic_write_bytes(Path(path), text.encode("utf-8"))
+
+
+def atomic_write_bytes(path: Path, data: bytes) -> None:
+    """Write *data* to *path* atomically (byte-exact variant)."""
+    _atomic_write_bytes(Path(path), data)
 
 
 def _atomic_write_bytes(path: Path, data: bytes) -> None:

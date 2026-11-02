@@ -65,7 +65,7 @@ Bot：你们固定周五晚八点开黑，别撞车。
 | 一个工作区 | 任意平台、任意群、任意私聊里的 Agent，cwd 与文件读写基准都是同一个共享根；A 群写的文件，B 群直接能读 |
 | 一份记忆 | `SOUL.md` 描述身份、语气与边界，`MEMORY.md` 保存长期记忆（谁是谁 / 群里的事 / 我自己的事 / 我学到的）；对话开始时把两者渲染成一段标着 `# 关于你自己` 的上下文，追加到系统提示 |
 | 看得见它记了什么 | 聊天里 `/astral memory show`、插件只读页，都能看到"它到底记了什么"；插件页没有任何写入口 |
-| 可观测、可回滚 | `/astral status` 与 `GET .../state` 给出生效状态、记忆目录与失败原因；停用插件即恢复原生"按会话分目录"的行为 |
+| 可观测、可回滚 | `/astral status` 与 `GET .../state` 给出生效状态、记忆目录、版本检查点与失败原因；有系统 Git 时可用 `/astral commit` 存档、`/astral recover` 回退（见[记忆版本控制](#记忆版本控制可选需要系统-git)）；停用插件即恢复原生"按会话分目录"的行为 |
 
 ## 它不能干什么
 
@@ -80,6 +80,9 @@ Bot：你们固定周五晚八点开黑，别撞车。
 | 不支持多进程 | 补丁只在各自进程内生效；多 worker 部署下各进程各打各的补丁，行为无法保证 |
 | `computer_use_runtime=sandbox` 时工作区不参与 Agent 执行 | Agent 在容器内的 `/workspace` 里干活，与宿主机共享根无关；`/astral status` 会提示 |
 | 没有文件上传与在线编辑 | 插件页只读；写文件请用聊天里的文件工具，或直接编辑共享根下的文件 |
+| 版本历史只覆盖四份内容文件 | `/astral recover` 只还原 `SOUL.md`、`MEMORY.md`、`AGENTS.md`、`EXTRA_PROMPT.md`；`skills/`、`shared/`、`memory/`、`archive/`、`.astral/` 不在版本控制内，仍需整目录备份 |
+| 没有系统 Git 就没有版本控制 | 记忆读写不依赖 Git；找不到 Git 时 `/astral commit` 与 `/astral recover` 提示不可用，装好 Git 或填 `version_control.git_path` 后重载插件即可 |
+| 版本历史不是隐私擦除工具 | Git 历史会保留已删除内容的旧版本；从文件里删掉的敏感信息仍留在历史提交里，要彻底移除需先备份再删除 `<共享根>/.git` |
 | 全局共享 = 跨群可见 | 隐私边界靠披露与守则约束，不做访问控制，详见[隐私披露](#隐私披露) |
 
 ## 配置说明
@@ -96,18 +99,27 @@ Bot：你们固定周五晚八点开黑，别撞车。
 | `memory.soul_budget_chars` | `SOUL.md` 的单次注入预算（字符） | `4000` | 超预算只截断快照，不改文件；完整内容用文件工具读取 |
 | `memory.memory_budget_chars` | `MEMORY.md` 的单次注入预算（字符） | `8000` | 同上；截断时提示行会给原文总字符数与绝对路径 |
 | `memory.soft_limit_chars` | `MEMORY.md` 的容量软上限（字符） | `20000` | 超过后快照尾部出现容量提示，插件页“运行与维护”里能看到这个上限；建议合并重复条目并归档到 `memory/archive/` |
+| `version_control.enabled` | 是否启用记忆版本控制（本地 Git 仓库） | `true` | 关闭后不再建仓、不提交，`/astral commit` 与 `/astral recover` 提示已关闭；已有 `.git` 原样保留但不使用。需要系统 Git |
+| `version_control.git_path` | Git 可执行文件路径 | 空字符串：自动查找 | 留空时从 `PATH` 与常见安装位置查找；提示「没找到 git」时填 git 可执行文件完整路径（也可以填包含 git 的目录） |
 
 记忆相关的四个配置项在配置页的 `memory` 分组下。它们只影响快照渲染与插件页的容量提示，不会修改磁盘上的文件。
+
+`version_control` 的两个配置项同样在插件配置页修改；它们只在插件加载时读取，改完必须重载插件。
 
 ## 指令
 
 | 指令 | 作用 |
 | --- | --- |
 | `/astral status` | 查看是否生效、记忆目录在哪、记忆概况，以及运行时告警。典型输出见下 |
-| `/astral clean [days]`（需要 AstrBot 管理员） | 把共享根**顶层**修改时间早于 `days` 天的普通文件**移动**到 `archive/<yyyyMMdd-HHmmss>/`。**只移动、不删除，可还原**；不递归，也不处理 `skills/`、`shared/`、`memory/`、`archive/`、`.astral/` 与四份内容文件。省略 `days` 时默认 **30** 天 |
+| `/astral clean [days]`（需要 AstrBot 管理员） | 把共享根**顶层**修改时间早于 `days` 天的普通文件**移动**到 `archive/<yyyyMMdd-HHmmss>/`。**只移动、不删除，可还原**；不递归，也不处理 `skills/`、`shared/`、`memory/`、`archive/`、`.astral/`、`.git/` 与四份内容文件。省略 `days` 时默认 **30** 天 |
 | `/astral memory show` | 查看记忆文件：默认 `memory`；私聊返回全文（超过 3000 字符截断并给出路径）；群聊只返回文件名、字符数、更新时间与前 3 行，完整内容请私聊或到 WebUI 只读页 |
+| `/astral commit`（别名 `/astral save`） | 把当前四份记忆文件存成一个版本，回复版本短哈希；没有改动时只提示当前最新版本。任何有执行权限的人都能用 |
+| `/astral recover`（需要 AstrBot 管理员） | 列出最近 10 个记忆版本（短哈希、时间、涉及文件数），并提示回退方式 |
+| `/astral recover <短哈希>`（需要 AstrBot 管理员） | 先自动保存当前状态，再把四份文件还原到该版本，最后创建一个「回退到 <短哈希>」的新提交；不执行 `git reset --hard`，回退本身也能再回退 |
 
 `/astral memory show [soul|memory|agents|extra]` 的四个参数分别对应 `SOUL.md`、`MEMORY.md`、`AGENTS.md`、`EXTRA_PROMPT.md`，大小写不敏感。
+
+`/astral commit` 与 `/astral save` 等价；`/astral recover` 需要 AstrBot 管理员，因为它会改写所有人的共享记忆。回退是追加式操作：先自动保存当前状态，再还原目标版本的字节内容，最后创建一个新提交；历史只增不减。
 
 `/astral status` 的典型输出（群里只回可行动的信息，不再有内部计数器）：
 
@@ -115,6 +127,8 @@ Bot：你们固定周五晚八点开黑，别撞车。
 Astral 已生效 ✅
 - 记忆目录：C:\AstrBot\data\workspaces\astral
 - 记忆概况：SOUL 620 字 / MEMORY 12 条（1.8k 字），最近 11-01 20:26 更新
+- 记忆版本：3 个检查点，最新 a1b2c3d（11-01 20:26）
+- 保存 / 回退：/astral commit · /astral recover
 - 看它记得什么：/astral memory show
 - 全局共享：所有平台、所有群共用这一份，别写密钥和别人的隐私。
 ```
@@ -128,6 +142,24 @@ Astral 未生效 ❌
 - 下一步：重载插件后再发一次 /astral status；还是不行就看插件页的提示。
 ```
 
+## 记忆版本控制（可选，需要系统 Git）
+
+Astral 可以把四份记忆文件像代码一样存档：每次保存是一个本地 Git 提交，写坏了能翻回上一个版本。这个功能是可选的，**没有 Git 也能正常读写记忆**。
+
+- **仓库位置**：`<共享根>/.git`。只跟踪 `SOUL.md`、`MEMORY.md`、`AGENTS.md`、`EXTRA_PROMPT.md` 四份内容文件；`skills/`、`shared/`、`memory/`、`archive/`、`.astral/` 通过 `.git/info/exclude` 排除在外，不会进入历史。
+- **自动基线**：插件首次加载（配置开启且找到 Git）时初始化仓库，并自动创建一个「初始快照」提交；之后**不会**在每次写记忆时自动提交，什么时候存档由你决定。
+- **存档**：`/astral commit` 或 `/astral save` 把当前四份文件存成一个版本，回复版本短哈希；没有改动时只提示当前最新版本。
+- **查看与回退**：`/astral recover` 列出最近 10 个版本；`/astral recover <短哈希>` 先自动保存当前状态，再把四份文件还原到目标版本，最后创建一个「回退到 <短哈希>」的新提交。**回退是追加式的**，历史只增不减，不使用 `git reset --hard`；回退本身也可以再回退。
+- **缓存**：回退成功后会清空快照缓存，下一轮对话直接使用回退后的记忆，不需要 `/new`。
+- **权限**：`/astral commit`、`/astral save` 所有有执行权限的人都能用；`/astral recover` 需要 AstrBot 管理员——它会改写所有人的共享记忆。
+- **身份与网络**：提交固定使用 `Astral <astral@localhost>` 身份；Git 只操作本地仓库，不设置远端、不 push、不联网。
+- **没有 Git 时**：记忆照常读写，只是 `/astral commit` 与 `/astral recover` 不可用；装好 Git 或在插件配置里填 `version_control.git_path` 后重载插件。
+- **磁盘**：`.git` 计入共享根体积，同样受 `quota_gb` 告警约束；`/astral clean` 只移动共享根顶层的散落文件，不会碰 `.git/`。
+- **隐私**：Git 历史会保留已删除内容的旧版本，**它不是隐私擦除工具**（见[隐私披露](#隐私披露)）。
+- **关闭与移除**：把 `version_control.enabled` 设为 `false` 并重载插件即可停用，已有 `.git` 原样保留但不再使用；要彻底删除历史，先备份整个共享根，再删除 `<共享根>/.git`。
+
+> 版本历史就在共享根里，按[升级与备份](#升级与备份)整目录备份时会一起备份；换机器时整目录拷回即可带上历史。
+
 ## HTTP 接口
 
 接口统一挂在 AstrBot Dashboard 的插件前缀下，例如本机默认端口：
@@ -138,7 +170,7 @@ Astral 未生效 ❌
 
 | 方法 | 路径 | 成功（200） | 失败语义 |
 | --- | --- | --- | --- |
-| GET | `/api/v1/plugins/extensions/astrbot_plugin_astral/state` | 返回 `installed`、`shared_root`、`baseline`、`runtime`、`consumers`、`disk`、`quota`、`memory`、`warnings`、`reason` | 503：插件已停用或补丁未安装，body 仍含 `installed=false` 与 `reason` |
+| GET | `/api/v1/plugins/extensions/astrbot_plugin_astral/state` | 返回 `installed`、`shared_root`、`baseline`、`runtime`、`consumers`、`disk`、`quota`、`memory`、`memory_summary`、`versioning`（`enabled`/`available`/`initialized`/`git`/`head`/`count`/`dirty`/`last`/`reason`）、`warnings`、`reason` | 503：插件已停用或补丁未安装，body 仍含 `installed=false` 与 `reason` |
 | GET | `/api/v1/plugins/extensions/astrbot_plugin_astral/files` | 不带 `name` 返回清单（`shared_root`、`memory_soft_limit`、四个文件的字符数/更新时间/`managed_ok`、归档索引）；带 `?name=SOUL` 返回单文件正文与 `truncated` 标记（可选 `MEMORY`、`AGENTS`、`EXTRA`，大小写不敏感） | 400 `unknown_name`（名称不在白名单或含 `../` 等注入尝试）、400 `forbidden_path`（解析后越出共享根）；404 `not_found`；500 `read_failed`；503 插件未安装 |
 | POST | `/api/v1/plugins/extensions/astrbot_plugin_astral/clean` | 归档完成，返回本次归档的时间戳目录与 `days` | 非法 `days` 按 30 处理并返回 200；503 插件未安装 |
 
@@ -156,10 +188,11 @@ Astral 未生效 ❌
 ├─ shared/             # 跨会话共享的交付物
 ├─ memory/archive/     # 记忆归档，MEMORY-YYYYMM.md
 ├─ archive/            # 其它归档
-└─ .astral/            # Astral 自用状态，不要手改
+├─ .astral/            # Astral 自用状态，不要手改
+└─ .git/               # 本地版本历史（Git 可用时存在；只跟踪四份内容文件）
 ```
 
-四份内容文件只在"不存在或为空白"时播种，**已有内容永不被覆盖**；想恢复默认模板，删除对应文件后重载插件即可。托管区段是唯一由 Astral 覆盖内容的位置，标记之外属于你。
+四份内容文件只在"不存在或为空白"时播种，**已有内容永不被覆盖**；想恢复默认模板，删除对应文件后重载插件即可。托管区段是唯一由 Astral 覆盖内容的位置，标记之外属于你。`.git/` 只在记忆版本控制开启且找到 Git 时存在，由 `/astral commit` / `/astral recover` 维护；不要手动 `git reset`。
 
 ## 隐私披露
 
@@ -169,6 +202,7 @@ Astral 未生效 ❌
 - **不要把密钥、口令、token、私钥、身份证/银行卡号、手机号/邮箱/住址，或第三方隐私写进工作区或记忆文件。** 需要记录"某人偏好"时请去标识化（写"群里有人偏好中文回复"，不要写群号 + 姓名 + 手机号）。
 - 群聊里的 `/astral memory show` 只给元信息与前 3 行，这是隐私要求而不是权限系统；完整内容请在私聊或 WebUI 只读页查看。
 - 需要删除记忆时，让 Agent 直接编辑文件删除对应条目并回报删了几行；没有独立回收站，备份就是回滚点。
+- **Git 历史会保留删除前的内容。** 记忆版本控制开启后，每次 `/astral commit` / `/astral recover` 都是本地提交；从文件里删掉的条目仍然存在于历史提交中。它不是隐私擦除工具；要彻底移除历史，先备份再删除 `<共享根>/.git` 重建。
 - Astral 不自动扫描敏感信息，也不加密、不做访问控制；是否写入由你和 Agent 遵守的守则判断。
 
 ## 升级与备份
@@ -190,6 +224,8 @@ Copy-Item -Recurse -Force "D:\backup\astral-20261102\*" "C:\AstrBot\data\workspa
 
 迁移到新机器：先在新机器配置好 `shared_root`，重启让插件建好目录骨架，再把备份内容拷回共享根并重启。对话快照是进程内内存态：同一进程内冻结，改文件后要 `/new` 才刷新；重启或重载插件后缓存清空，已有对话下一轮会按当前文件重建一次。
 
+共享根里的 `.git/` 会随整目录备份一起复制，记忆版本历史也在备份里；换机器时整目录拷回即可继续使用。备份前建议先发一次 `/astral commit`，把当前记忆存成明确版本。
+
 升级 AstrBot 之后：
 
 1. 重载插件，发 `/astral status`，确认「Astral 已生效」、记忆目录正确；
@@ -203,6 +239,11 @@ Copy-Item -Recurse -Force "D:\backup\astral-20261102\*" "C:\AstrBot\data\workspa
 | --- | --- |
 | 它说"记下了"，但 `MEMORY.md` 里没有？ | 九成是 Computer Use 运行时没设成本机环境（默认 `none`），Bot 没有文件工具。按[装完三步](#装完三步)第 ② 步改完并重载插件。 |
 | 改了 `SOUL.md` / `MEMORY.md`，为什么这一轮对话没变化？ | 快照在对话开始时冻结，本轮不刷新。改完文件后要 `/new` 开新对话才会加载新内容。 |
+| 记忆写错或删错了怎么办？ | 先看 `/astral recover` 的历史列表，管理员用 `/astral recover <短哈希>` 回退。回退前会自动保存当前状态，所以回退本身也能再回退。 |
+| 没有安装 Git 能用吗？ | 能。记忆读写完全不依赖 Git，只是 `/astral commit`、`/astral recover` 提示不可用。装好 Git 或在配置里填 `version_control.git_path` 后重载插件。 |
+| `/astral recover` 安全吗？会不会把别的文件也改写？ | 只还原四份内容文件，且回退前自动保存当前状态、回退后创建新提交；不执行 `git reset --hard`。`skills/`、`shared/`、`archive/` 不在版本控制内，不受影响。 |
+| 版本列表会不会泄露记忆内容？ | 不会显示正文。`/astral recover` 本身需要管理员，列表只有短哈希、时间与涉及文件数；完整历史在共享根的 `.git` 里。 |
+| 怎么关闭或删除版本历史？ | 配置里把 `version_control.enabled` 设为 `false` 并重载插件，已有 `.git` 保留但不再使用。要彻底删除历史，先备份整个共享根，再删除 `<共享根>/.git`。 |
 | `/reset` 能刷新快照吗？ | 不能。`/reset` 只清空对话历史、不换对话 ID（cid），快照仍然复用；要换新快照请用 `/new`。 |
 | 群聊里 `/astral memory show` 为什么只有几行？ | 群聊只给元信息与前 3 行（隐私要求），完整内容请私聊机器人或在 WebUI 只读页查看。 |
 | 第三方 agent runner 能用吗？ | 未验证。快照追加在 `system_prompt` 末尾，依赖 core 采纳该字段；第三方 runner（`agent_runner.runner_type`）下是否生效没有测试，按"未知 / 未支持"对待。 |
@@ -236,13 +277,14 @@ Set-Location "C:\AstrBot\data\plugins\astrbot_plugin_astral"
 | `tests/test_ws_shared.py` | 4 个函数的补丁、双写（含负对照）、幂等安装与还原 |
 | `tests/test_store.py` | `.astral/` 状态与审计写入、配额告警、移动归档 |
 | `tests/test_templates.py` | 四份默认模板（与 plan 逐字比对）、托管区段重写与原子写 |
+| `tests/test_versioning.py` | 本地 Git 仓库初始化与排除规则、只提交四份内容文件、回退的追加式行为与拒绝场景；需要真实 `git`，缺失时整组跳过 |
 | `tests/test_snapshot.py` | 快照渲染、HTML 注释剥离、预算截断、降级与缓存命中 |
 | `tests/test_coordinates.py` | 源码坐标回归（函数存在性、签名、消费者 import 形态） |
 | `tests/test_main_hooks.py` | 插件装配、state 载荷、快照注入与冻结、files 接口、端点 503 自检 |
 | `tests/test_plugin_load.py` | 以 `data.plugins.<插件名>.main` 包路径导入并检查指令/钩子注册 |
 | `tests/test_smoke_env.py` | 测试环境自检（AstrBot 可导入、4 个解析函数存在） |
 
-## 真实实例验收（v1.0.0）
+## 真实实例验收
 
 以下结果在 AstrBot 4.29.4 实例上实测（2026-11-02）：
 
@@ -250,7 +292,13 @@ Set-Location "C:\AstrBot\data\plugins\astrbot_plugin_astral"
 - `GET .../state` → 200，`installed=true`；`GET .../files` → 200，`?name=SOUL` 含 `content`，`?name=../../etc/passwd` → 400 `unknown_name`。
 - 停用插件后 `state` → 503 且 `installed=false`；重新启用 → 200 且 `installed=true`。
 - 群里 `/astral status` 输出生效状态与记忆概况；`/astral memory show` 私聊给全文、群聊只给元信息与前 3 行。
-- 全量 `pytest tests -q` = 157 passed / 2 skipped（Windows 无符号链接权限）。
+- 全量 `pytest tests -q` = 202 passed / 3 skipped（符号链接等用例在 Windows 上跳过）。
+
+记忆版本控制（未发布，待真实实例复核）：
+
+- 首次加载后共享根出现 `.git/`，`git log` 有一条「初始快照」基线提交；`.git/info/exclude` 只放行四份内容文件。
+- `/astral commit` 新增一个提交并回复短哈希；`/astral recover` 列出该版本；管理员 `/astral recover <短哈希>` 后四份文件字节与目标版本一致，并新增「回退到 …」提交。
+- 把 `version_control.enabled` 设为 `false` 并重载后不再建仓/提交，`/astral commit` 提示已关闭，记忆读写不受影响；重新开启后继续使用已有 `.git`。
 
 完整验收记录见 [CHANGELOG.md](CHANGELOG.md)。
 

@@ -30,6 +30,8 @@ CONFIG_KEYS = (
     "memory.soul_budget_chars",
     "memory.memory_budget_chars",
     "memory.soft_limit_chars",
+    "version_control.enabled",
+    "version_control.git_path",
 )
 
 
@@ -167,6 +169,10 @@ def test_readme_documents_commands_and_http_api() -> None:
         "/astral status",
         "/astral clean [days]",
         "/astral memory show [soul|memory|agents|extra]",
+        "/astral commit",
+        "/astral save",
+        "/astral recover",
+        "/astral recover <短哈希>",
     ):
         assert command in readme, f"README is missing command: {command}"
     for route in (
@@ -177,6 +183,28 @@ def test_readme_documents_commands_and_http_api() -> None:
         assert route in readme, f"README is missing route: {route}"
     for status_code in ("200", "400", "503"):
         assert status_code in readme, f"README is missing HTTP status: {status_code}"
+
+
+def test_readme_documents_memory_version_control() -> None:
+    """The unreleased Git versioning feature must be documented for users."""
+    readme = _read(README)
+    for phrase in (
+        "记忆版本控制",
+        "系统 Git",
+        "/astral commit",
+        "/astral save",
+        "/astral recover",
+        ".git",
+        "version_control.enabled",
+        "version_control.git_path",
+        "versioning",
+    ):
+        assert phrase in readme, f"README is missing version control phrase: {phrase}"
+    # rollback must be described as append-only, never as a destructive reset
+    assert "追加式" in readme
+    assert "git reset --hard" in readme
+    # history retention is a privacy fact, not an implementation detail
+    assert "隐私擦除" in readme
 
 
 def test_readme_faq_covers_known_pitfalls() -> None:

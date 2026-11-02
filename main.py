@@ -19,6 +19,7 @@ from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star
 
 if __package__:
+    from . import commands as commands_mod
     from . import config as config_mod
     from . import lifecycle
     from . import snapshot as snapshot_mod
@@ -27,6 +28,7 @@ if __package__:
     from . import webapi as webapi_mod
     from . import ws_shared
 else:  # pragma: no cover - direct import for tests
+    import commands as commands_mod
     import config as config_mod
     import lifecycle
     import snapshot as snapshot_mod
@@ -74,6 +76,10 @@ class AstralPlugin(Star):
     def managed_state(self) -> str:
         return self._managed_state
 
+    def clear_snapshot_cache(self) -> None:
+        """Drop every frozen memory snapshot so the next request re-renders."""
+        self._cache.clear()
+
     def runtime(self) -> str:
         try:
             config = self.context.get_config()
@@ -104,7 +110,7 @@ class AstralPlugin(Star):
     async def terminate(self) -> None:
         """Restore every patched module attribute and drop the snapshot cache."""
         lifecycle.terminate(self)
-        self._cache.clear()
+        self.clear_snapshot_cache()
 
     @filter.on_astrbot_loaded()
     async def on_astrbot_loaded(self) -> None:
@@ -202,12 +208,7 @@ class AstralPlugin(Star):
     @filter.command_group("astral")
     async def astral(self, event: AstrMessageEvent):
         """Astral 指令组。"""
-        yield event.plain_result(
-            "Astral · 让我记住群里的事\n"
-            "/astral status —— 我现在记了多少、有没有生效\n"
-            "/astral memory show [soul|memory|agents|extra] —— 看我的设定和记忆\n"
-            "/astral clean [天数] —— 把 N 天没动过的散落文件挪进 archive/（默认 30 天，只移动不删除）",
-        )
+        yield event.plain_result(commands_mod.help_text())
 
     @astral.command("status")
     async def astral_status(self, event: AstrMessageEvent):
@@ -229,6 +230,17 @@ class AstralPlugin(Star):
             f"已把 {result['moved']} 个文件挪到 {result['dest']}（只移动不删除）。\n"
             f"要还原就把那个目录里的文件拷回共享根。",
         )
+
+    @astral.command("commit", alias={"save"})
+    async def astral_commit(self, event: AstrMessageEvent):
+        """把当前记忆文件存成一个版本。"""
+        yield event.plain_result(await commands_mod.save_memory(self))
+
+    @astral.command("recover")
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    async def astral_recover(self, event: AstrMessageEvent, target: str = ""):
+        """查看记忆版本；带短哈希时回退到该版本。"""
+        yield event.plain_result(await commands_mod.recover_memory(self, target))
 
     @astral.group("memory")
     async def astral_memory(self, event: AstrMessageEvent):

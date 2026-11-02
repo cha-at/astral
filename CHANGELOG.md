@@ -4,6 +4,16 @@
 
 ## 未发布
 
+### 记忆版本控制
+
+- **本地版本历史**：插件加载时在共享根初始化 `<共享根>/.git`（仅当 `version_control.enabled` 开启且找到系统 Git）。`.git/info/exclude` 只放行 `SOUL.md`、`MEMORY.md`、`AGENTS.md`、`EXTRA_PROMPT.md` 四份内容文件，其余内容全部排除；首启自动创建「初始快照」基线提交，之后不会在每次写记忆时自动提交。
+- **新指令**：`/astral commit`（别名 `/astral save`）把当前四份文件存成一个版本，所有有执行权限的人可用；`/astral recover` 列出最近 10 个版本；`/astral recover <短哈希>` 回退（需要 AstrBot 管理员）。
+- **追加式回退**：回退前自动保存当前状态，把目标版本的字节内容写回四份文件，再创建一个「回退到 <短哈希>」提交；不使用 `git reset --hard` / `git checkout`，历史只增不减，回退本身也能再回退。
+- **回退后生效**：回退成功清空快照缓存，下一轮对话直接使用回退后的记忆。
+- **配置**：新增 `version_control.enabled`（默认 `true`）与 `version_control.git_path`（默认空，自动查找 Git）；关闭后不再建仓、不提交，已有 `.git` 保留但不再使用。
+- **依赖与安全边界**：不新增 Python 依赖，仍只用标准库；Git 通过 `subprocess` 调用，无 shell、固定 `-c` 配置、固定身份 `Astral <astral@localhost>`、`GIT_TERMINAL_PROMPT=0`，只操作本地仓库，不 push、不联网。
+- **测试**：新增 `tests/test_versioning.py`（需要真实 `git`，缺失时整组跳过）；`tests/test_config.py` 覆盖 `version_control` 归一化，`tests/test_views_contract.py` 覆盖 README 的版本控制契约。全量 `pytest tests -q`：202 passed / 3 skipped。
+
 ### 兼容范围
 
 - **`astrbot_version` 从 `>=4.29.4,<4.30` 放宽到 `>=4.27.0,<5`**。原来的范围把"我只在 4.29.4 上实测过"写成了"只有 4.29.4 能用"。AstrBot 的校验是标准 PEP 440（`packaging.SpecifierSet`），越界即拒绝安装，且重启后依旧不加载，代价远大于收益。核对上游后确认：补丁依赖的四个工作区解析函数自 4.27.0 起逐字节未变（4.26.5 引入，4.27.0 定型，4.27.0–4.29.4 是同一个 blob），4.28→4.29 的差异是新增钩子而非改名，因此下限取 4.27.0；上限按 AstrBot 文档推荐的写法取 `<5`，不再用 `<4.30` 一刀切掉 4.30 之后的潜在兼容性。
@@ -14,6 +24,8 @@
 
 - 市场卡片与 README 的"只适配 4.29.x"改成"兼容 4.27.0 到 4.x，只在 4.29.4 上完整实测"。
 - `tests/test_plugin_load.py` 新增用例校验 `astrbot_version` 是合法 PEP 440 且覆盖 4.27.0–4.x；`tests/test_coordinates.py` 的版本闸门改为直接读 metadata，避免测试与市场门槛再次漂移。
+- README 增加「记忆版本控制」一节，并在能力表、限制表、配置表、指令表、状态示例、HTTP 状态字段、共享根结构、隐私披露、备份、FAQ、验收与测试表中补充版本控制说明。
+- `docs/dev-notes.md` 增加 `versioning.py` / `commands.py` 模块、版本控制契约、数据流与升级回归项；`tests/README.md` 增加 `test_versioning.py`；`AGENTS.md` 更新当前状态；`metadata.yaml` 简介补充 `/astral commit` / `/astral recover`（版本号仍为 1.0.0，不随未发布功能升级）。
 
 ## v1.0.0 · 2026-11-02
 

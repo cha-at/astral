@@ -32,6 +32,8 @@ def test_module_constants_and_defaults():
     assert config.MEMORY_DEFAULTS["soul_budget_chars"] == 4000
     assert config.MEMORY_DEFAULTS["memory_budget_chars"] == 8000
     assert config.MEMORY_DEFAULTS["soft_limit_chars"] == 20000
+    assert config.VERSION_CONTROL_DEFAULTS["enabled"] is True
+    assert config.VERSION_CONTROL_DEFAULTS["git_path"] == ""
 
 
 def test_config_error_carries_reason():
@@ -264,6 +266,9 @@ def test_read_options_defaults():
     assert isinstance(options["memory"], dict)
     for key, value in config.MEMORY_DEFAULTS.items():
         assert options["memory"][key] == value
+    assert isinstance(options["version_control"], dict)
+    for key, value in config.VERSION_CONTROL_DEFAULTS.items():
+        assert options["version_control"][key] == value
 
 
 def test_read_options_passes_valid_values_through():
@@ -273,6 +278,10 @@ def test_read_options_passes_valid_values_through():
         "forbidden_roots": ["D:/secret"],
         "quota_gb": 5,
         "memory": {"enabled": False, "soft_limit_chars": 12000},
+        "version_control": {
+            "enabled": False,
+            "git_path": "C:/Program Files/Git/bin/git.exe",
+        },
     }
     options = config.read_options(cfg)
     assert options["shared_root_raw"] == "myws"
@@ -285,6 +294,8 @@ def test_read_options_passes_valid_values_through():
         options["memory"]["memory_budget_chars"]
         == config.MEMORY_DEFAULTS["memory_budget_chars"]
     )
+    assert options["version_control"]["enabled"] is False
+    assert options["version_control"]["git_path"] == "C:/Program Files/Git/bin/git.exe"
 
 
 def test_read_options_falls_back_on_dirty_values():
@@ -294,6 +305,7 @@ def test_read_options_falls_back_on_dirty_values():
         "forbidden_roots": "D:/secret",
         "quota_gb": "not-a-number",
         "memory": "not-a-dict",
+        "version_control": "not-a-dict",
     }
     options = config.read_options(cfg)
     assert options["shared_root_raw"] == ""
@@ -303,6 +315,9 @@ def test_read_options_falls_back_on_dirty_values():
     assert isinstance(options["memory"], dict)
     for key, value in config.MEMORY_DEFAULTS.items():
         assert options["memory"][key] == value
+    assert isinstance(options["version_control"], dict)
+    for key, value in config.VERSION_CONTROL_DEFAULTS.items():
+        assert options["version_control"][key] == value
 
 
 def test_memory_options_defaults_and_partial_merge():
@@ -331,3 +346,55 @@ def test_memory_options_ignores_invalid_values(cfg):
     assert isinstance(options, dict)
     for key, value in config.MEMORY_DEFAULTS.items():
         assert options[key] == value
+
+
+# ---------------------------------------------------------------------------
+# version_control_options: tolerant normalisation (unreleased feature)
+# ---------------------------------------------------------------------------
+
+
+def test_version_control_options_defaults_and_partial_merge():
+    defaults = config.version_control_options(None)
+    assert defaults == dict(config.VERSION_CONTROL_DEFAULTS)
+
+    partial = config.version_control_options({"version_control": {"enabled": False}})
+    assert partial["enabled"] is False
+    assert partial["git_path"] == config.VERSION_CONTROL_DEFAULTS["git_path"]
+
+    path_only = config.version_control_options(
+        {"version_control": {"git_path": "  C:/Program Files/Git/bin/git.exe  "}}
+    )
+    assert path_only["enabled"] is True
+    assert path_only["git_path"] == "C:/Program Files/Git/bin/git.exe"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (True, True),
+        (False, False),
+        ("false", False),
+        ("off", False),
+        ("0", False),
+        (0, False),
+        ("true", True),
+        ("yes", True),
+        ("1", True),
+        (1, True),
+        ("not-a-bool", True),
+        (None, True),
+    ],
+)
+def test_version_control_enabled_is_coerced_tolerantly(raw, expected):
+    options = config.version_control_options({"version_control": {"enabled": raw}})
+    assert options["enabled"] is expected
+
+
+@pytest.mark.parametrize(
+    "group",
+    [None, "not-a-dict", {"git_path": 123}, {"git_path": None}, {"git_path": ""}],
+)
+def test_version_control_ignores_invalid_git_path(group):
+    options = config.version_control_options({"version_control": group})
+    assert options["git_path"] == ""
+    assert options["enabled"] is True

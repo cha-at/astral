@@ -92,6 +92,7 @@ def test_agents_template_lists_directories():
         "memory/archive/",
         "archive/",
         ".astral/",
+        ".git/",
     ):
         assert token in templates.AGENTS_TEMPLATE, token
     assert "## 目录" in templates.AGENTS_TEMPLATE
@@ -226,6 +227,14 @@ def test_atomic_write_text_is_utf8_lf(tmp_path):
     assert raw == "第一行\n第二行\n".encode("utf-8")
     assert b"\r\n" not in raw
     assert not raw.startswith(b"\xef\xbb\xbf")
+    assert list(tmp_path.glob(".*.tmp.*")) == []
+
+
+def test_atomic_write_bytes_is_byte_exact(tmp_path):
+    target = tmp_path / "MEMORY.md"
+    target.write_bytes(b"old\r\n")
+    templates.atomic_write_bytes(target, b"\xff\xfe\r\nnew")
+    assert target.read_bytes() == b"\xff\xfe\r\nnew"
     assert list(tmp_path.glob(".*.tmp.*")) == []
 
 

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -18,8 +20,11 @@ from types import SimpleNamespace
 import pytest
 from starlette.datastructures import Headers, QueryParams
 
+import commands
 import config
 import snapshot
+import state as state_mod
+import versioning
 import ws_shared
 
 
@@ -64,6 +69,7 @@ def plugin_factory(tmp_path):
                 "memory_budget_chars": 8000,
                 "soft_limit_chars": 20000,
             },
+            "version_control": {"enabled": True, "git_path": ""},
         }
         raw.update(overrides)
         context = FakeContext(runtime=overrides.pop("runtime", "local"))
@@ -353,10 +359,13 @@ def test_status_text_and_warnings(plugin_factory):
     assert "记忆概况" in text
     assert "/astral memory show" in text
     assert "全局共享" in text
+    assert "记忆版本" in text
+    assert "/astral commit" in text
     # patch internals stay out of chat output
     assert "consumers" not in text
     assert "831abae85" not in text
-    assert payload["warnings"] == []
+    # The version warning is environment-dependent (git may be absent).
+    assert [item for item in payload["warnings"] if "git" not in item.lower()] == []
 
     sandbox_plugin, _ = plugin_factory(runtime="sandbox")
     sandbox_payload = sandbox_plugin.state_payload()
@@ -418,3 +427,108 @@ def test_all_endpoints_503_after_terminate(plugin_factory):
         body = json.loads(response.body)
         assert body["installed"] is False
         assert body["message"]
+
+
+def _git_available() -> bool:
+    return shutil.which("git") is not None
+
+
+def test_versioning_repo_initialized_on_seed(plugin_factory):
+    if not _git_available():
+        pytest.skip("git is not installed")
+    plugin, shared = plugin_factory()
+    _run(plugin.initialize())
+
+    assert (shared / ".git").is_dir()
+    summary = versioning.summary(shared)
+    assert summary["enabled"] is True
+    assert summary["available"] is True
+    assert summary["initialized"] is True
+    assert summary["head"]
+    assert summary["count"] == 1
+
+    tracked = subprocess.run(
+        ["git", "-C", str(shared), "ls-files"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+    assert {line for line in tracked if line.strip()} == set(versioning.TRACKED_FILES)
+
+
+def test_versioning_commit_and_recover_commands(plugin_factory):
+    if not _git_available():
+        pytest.skip("git is not installed")
+    plugin, shared = plugin_factory()
+    _run(plugin.initialize())
+
+    memory = shared / "MEMORY.md"
+    memory.write_text("v1 记忆\n", encoding="utf-8")
+    commit_text = _run(commands.save_memory(plugin))
+    assert "已保存记忆" in commit_text
+    head = versioning.summary(shared)["head"]
+    assert head and head in commit_text
+
+    event = SimpleNamespace(
+        unified_msg_origin="telegram:GroupMessage:1",
+        is_private_chat=lambda: False,
+    )
+    req = SimpleNamespace(system_prompt="", conversation=None)
+    _run(plugin.inject_memory_snapshot(event, req))
+    assert len(plugin._cache) == 1
+    assert "v1 记忆" in req.system_prompt
+
+    memory.write_text("v2 记忆\n", encoding="utf-8")
+    recover_text = _run(commands.recover_memory(plugin, head))
+    assert "已回退到" in recover_text
+    assert memory.read_text(encoding="utf-8") == "v1 记忆\n"
+    assert len(plugin._cache) == 0
+
+    list_text = _run(commands.recover_memory(plugin, ""))
+    assert "最近的记忆版本" in list_text
+    assert head in list_text
+
+    payload = plugin.state_payload()
+    assert payload["versioning"]["initialized"] is True
+    assert payload["versioning"]["head"] != head
+    status = state_mod.status_text(payload)
+    assert "记忆版本" in status
+    assert "/astral commit" in status
+
+
+def test_version_control_disabled(plugin_factory):
+    plugin, shared = plugin_factory(version_control={"enabled": False})
+    _run(plugin.initialize())
+
+    assert not (shared / ".git").exists()
+    text = _run(commands.save_memory(plugin))
+    assert "已关闭" in text
+    payload = plugin.state_payload()
+    assert payload["versioning"]["enabled"] is False
+    assert "已关闭" in state_mod.status_text(payload)
+
+
+def test_version_control_git_missing(plugin_factory, monkeypatch):
+    monkeypatch.setattr(versioning, "find_git", lambda configured="": None)
+    plugin, shared = plugin_factory()
+    _run(plugin.initialize())
+
+    assert not (shared / ".git").exists()
+    payload = plugin.state_payload()
+    assert payload["versioning"]["available"] is False
+    assert any("git" in warning.lower() for warning in payload["warnings"])
+    text = _run(commands.save_memory(plugin))
+    assert "没找到 git" in text or "不可用" in text
+
+
+def test_recover_without_target_lists_versions(plugin_factory):
+    if not _git_available():
+        pytest.skip("git is not installed")
+    plugin, shared = plugin_factory()
+    _run(plugin.initialize())
+
+    (shared / "MEMORY.md").write_text("checkpoint\n", encoding="utf-8")
+    _run(commands.save_memory(plugin))
+    text = _run(commands.recover_memory(plugin, ""))
+    assert "最近的记忆版本" in text
+    assert "回退：/astral recover <短哈希>" in text

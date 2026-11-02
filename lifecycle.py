@@ -16,12 +16,14 @@ if __package__:
     from . import state as state_mod
     from . import store as store_mod
     from . import templates as templates_mod
+    from . import versioning
     from . import ws_shared
 else:  # pragma: no cover - direct import for tests
     import config as config_mod
     import state as state_mod
     import store as store_mod
     import templates as templates_mod
+    import versioning
     import ws_shared
 
 logger = logging.getLogger("astrbot")
@@ -89,6 +91,7 @@ def state_file_payload(plugin: Any) -> dict[str, Any]:
         "patch_webchat_projects": plugin.options["patch_webchat_projects"],
         "quota_gb": plugin.options["quota_gb"],
         "memory": dict(plugin.options["memory"]),
+        "version_control": dict(plugin.options.get("version_control") or {}),
     }
 
 
@@ -125,6 +128,31 @@ def seed(plugin: Any) -> None:
             root / "EXTRA_PROMPT.md",
         )
     logger.info("astral: seed=%s managed=%s", seeded, managed)
+    version_options = plugin.options.get("version_control") or {}
+    if isinstance(version_options, dict) and version_options.get("enabled", True):
+        git_path = version_options.get("git_path")
+        try:
+            report = versioning.ensure_repo(
+                root,
+                git_path=git_path if isinstance(git_path, str) else "",
+            )
+        except Exception:
+            logger.exception("astral: version repository init failed")
+        else:
+            if report.get("created"):
+                store_mod.append_audit(
+                    root,
+                    "version_init",
+                    {
+                        "owned": report.get("owned"),
+                        "baseline": report.get("baseline"),
+                    },
+                )
+            if not report.get("ok"):
+                logger.warning(
+                    "astral: version repository unavailable: %s",
+                    report.get("reason"),
+                )
     refresh_state_file(plugin)
 
 

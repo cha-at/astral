@@ -53,5 +53,24 @@
         "default": 20000
       }
     }
+  },
+  "version_control": {
+    "type": "object",
+    "description": "记忆版本控制（可选，需要系统 Git）",
+    "hint": "加载时在共享根初始化本地 Git 仓库，只跟踪 SOUL.md / MEMORY.md / AGENTS.md / EXTRA_PROMPT.md 四份内容文件；/astral commit 存档、/astral recover 回退。关闭后不再建仓、不提交，已有 .git 保持原样但不再使用。改完重载插件生效。",
+    "items": {
+      "enabled": {
+        "type": "bool",
+        "description": "启用记忆版本控制（需要系统 Git）",
+        "hint": "关闭后插件不再初始化仓库、也不再提交；已有 .git 不会被删除，但 /astral commit 与 /astral recover 会提示已关闭。",
+        "default": true
+      },
+      "git_path": {
+        "type": "string",
+        "description": "git 可执行文件路径（留空自动查找）",
+        "hint": "留空时从 PATH 与常见安装位置自动查找；提示「没找到 git」时填 git 可执行文件的完整路径（也可以填包含 git 的目录）。",
+        "default": ""
+      }
+    }
   }
 }

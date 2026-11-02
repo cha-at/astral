@@ -15,9 +15,11 @@ from typing import Any
 
 if __package__:
     from . import store as store_mod
+    from . import versioning
     from . import ws_shared
 else:  # pragma: no cover - direct import for tests
     import store as store_mod
+    import versioning
     import ws_shared
 
 logger = logging.getLogger("astrbot")
@@ -141,7 +143,12 @@ def _has_cjk(text: str) -> bool:
     return bool(_CJK_RE.search(text or ""))
 
 
-def build_warnings(plugin: Any, root: Path | None, status: dict[str, Any]) -> list[str]:
+def build_warnings(
+    plugin: Any,
+    root: Path | None,
+    status: dict[str, Any],
+    version_state: dict[str, Any] | None = None,
+) -> list[str]:
     """Collect actionable warnings for the state payload (001 FR-7 / FR-11)."""
     if not plugin.is_installed():
         return []
@@ -177,6 +184,18 @@ def build_warnings(plugin: Any, root: Path | None, status: dict[str, Any]) -> li
             warnings.append(
                 f"共享根体积 {quota['size_gb']} GB 超过阈值 {quota['limit_gb']} GB（只告警，不删除文件）",
             )
+    if version_state and root is not None and root.is_dir():
+        if version_state.get("enabled", True) and version_state.get("available") is False:
+            warnings.append(
+                "没找到 git：记忆版本控制不可用（/astral commit、/astral recover 会失败）；"
+                "装好 Git 后重载插件，或在插件配置里填 version_control.git_path",
+            )
+        elif (
+            version_state.get("enabled", True)
+            and version_state.get("initialized") is False
+            and version_state.get("reason")
+        ):
+            warnings.append(f"记忆版本仓库不可用：{version_state['reason']}")
     if plugin.managed_state() == "broken":
         warnings.append(
             "EXTRA_PROMPT.md 的 astral:managed 标记异常，Astral 已停止自动改写该区段",
@@ -184,6 +203,35 @@ def build_warnings(plugin: Any, root: Path | None, status: dict[str, Any]) -> li
     if not plugin.memory_options()["enabled"]:
         warnings.append("记忆快照注入已关闭（memory.enabled=false）")
     return warnings
+
+
+def _version_lines(state: dict[str, Any]) -> list[str]:
+    """Render the version status lines for '/astral status'."""
+    if not state:
+        return []
+    if not state.get("enabled", True):
+        return ["- 记忆版本：已关闭"]
+    if state.get("available") is False:
+        reason = state.get("reason") or "没找到 git"
+        return [f"- 记忆版本：不可用（{reason}）"]
+    if not state.get("initialized"):
+        reason = state.get("reason")
+        if reason:
+            return [f"- 记忆版本：还没初始化（{reason}）"]
+        return ["- 记忆版本：还没初始化；下次重载插件会自动建仓"]
+    head = state.get("head")
+    if not head:
+        return ["- 记忆版本：还没有检查点；发 /astral commit 保存一次"]
+    count = int(state.get("count") or 0)
+    last = state.get("last") or {}
+    if last:
+        when = _format_short_time(last.get("timestamp"))
+        line = f"- 记忆版本：{count} 个检查点，最新 {head}（{when}）"
+    else:
+        line = f"- 记忆版本：{count} 个检查点，最新 {head}"
+    if state.get("dirty"):
+        line += "，有未提交改动"
+    return [line, "- 保存 / 回退：/astral commit · /astral recover"]
 
 
 def build_state(plugin: Any) -> dict[str, Any]:
@@ -203,6 +251,38 @@ def build_state(plugin: Any) -> dict[str, Any]:
         if root is not None
         else {"limit_gb": plugin.options["quota_gb"], "size_gb": 0.0, "warn": False}
     )
+    version_options = (
+        plugin.options.get("version_control")
+        if isinstance(plugin.options, dict)
+        else None
+    )
+    version_options = version_options if isinstance(version_options, dict) else {}
+    version_enabled = bool(version_options.get("enabled", True))
+    version_git_path = version_options.get("git_path")
+    if not isinstance(version_git_path, str):
+        version_git_path = ""
+    if root is not None:
+        try:
+            version_state = versioning.summary(
+                root,
+                git_path=version_git_path,
+                enabled=version_enabled,
+            )
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("astral: versioning summary failed")
+            version_state = {
+                "enabled": version_enabled,
+                "available": False,
+                "initialized": False,
+                "reason": "读取版本状态失败",
+            }
+    else:
+        version_state = {
+            "enabled": version_enabled,
+            "available": None,
+            "initialized": False,
+            "reason": "共享根不可用",
+        }
     return {
         "installed": installed,
         "shared_root": str(root) if root is not None else None,
@@ -221,7 +301,8 @@ def build_state(plugin: Any) -> dict[str, Any]:
         "quota": quota,
         "memory": dict(plugin.memory_options(), managed=plugin.managed_state()),
         "memory_summary": memory_summary(root),
-        "warnings": build_warnings(plugin, root, status),
+        "versioning": version_state,
+        "warnings": build_warnings(plugin, root, status, version_state),
     }
 
 
@@ -240,6 +321,7 @@ def status_text(payload: dict[str, Any]) -> str:
             "Astral 已生效 ✅",
             f"- 记忆目录：{root or '（未知）'}",
             f"- 记忆概况：{_memory_overview(summary)}",
+            *_version_lines(payload.get("versioning") or {}),
             "- 看它记得什么：/astral memory show",
             "- 全局共享：所有平台、所有群共用这一份，别写密钥和别人的隐私。",
         ]
@@ -302,3 +384,77 @@ def memory_show_text(plugin: Any, event: Any, target: str) -> str:
             f"...（已截断，全文见 {path}）\n{SNAPSHOT_REFRESH_HINT}"
         )
     return f"{header}\n---\n{text}\n{SNAPSHOT_REFRESH_HINT}"
+
+
+def _join_names(names: list[Any], limit: int = 6) -> str:
+    values = [str(name) for name in names if str(name).strip()]
+    if not values:
+        return "（无文件变化）"
+    if len(values) <= limit:
+        return "、".join(values)
+    return "、".join(values[:limit]) + f" 等 {len(values)} 个"
+
+
+def version_commit_text(result: dict[str, Any]) -> str:
+    """Render '/astral commit' and '/astral save' answers."""
+    status = str(result.get("status") or "")
+    if status == "no_changes":
+        head = result.get("hash")
+        if head:
+            return f"没有新改动，当前最新版本是 {head}。"
+        return "没有可保存的内容。"
+    if status != "committed":
+        return f"保存失败：{result.get('reason') or '未知原因'}"
+    head = result.get("hash") or "（未知）"
+    files = _join_names(list(result.get("files") or []))
+    return (
+        "已保存记忆 ✅\n"
+        f"- 版本：{head}\n"
+        f"- 文件：{files}\n"
+        f"- 回退：/astral recover {head}"
+    )
+
+
+def version_list_text(result: dict[str, Any]) -> str:
+    """Render '/astral recover' without a hash."""
+    status = str(result.get("status") or "")
+    if status == "unavailable":
+        return f"记忆版本控制不可用：{result.get('reason') or '没找到 git'}"
+    versions = list(result.get("versions") or [])
+    if status != "ok" or not versions:
+        return "还没有记忆版本。发 /astral commit 保存一个。"
+    lines = ["最近的记忆版本："]
+    for item in versions:
+        short = item.get("hash") or "（未知）"
+        when = _format_short_time(item.get("timestamp"))
+        count = len(item.get("files") or [])
+        suffix = f"{count} 个文件" if count else "无文件变化"
+        lines.append(f"- {short} · {when} · {suffix}")
+    lines.append("回退：/astral recover <短哈希>（回退前会自动保存当前状态）")
+    return "\n".join(lines)
+
+
+def version_recover_text(result: dict[str, Any]) -> str:
+    """Render '/astral recover <short-hash>' answers."""
+    status = str(result.get("status") or "")
+    target = result.get("target") or "（未知）"
+    if status == "no_changes":
+        return f"当前已经是 {target}，不需要回退。"
+    if status == "recovered_uncommitted":
+        error = result.get("error") or "未知原因"
+        return (
+            f"记忆文件已回退到 {target}，但没能记成新版本：{error}\n"
+            "当前文件已经是回退后的内容；请发 /astral commit 保存，或检查 Git 状态。"
+        )
+    if status != "recovered":
+        return f"回退失败：{result.get('reason') or '未知原因'}"
+    lines = [f"已回退到 {target} ✅"]
+    before = result.get("before")
+    if before and before != target:
+        lines.append(f"- 回退前已保存当前状态：{before}")
+    lines.append(f"- 现在的最新版本：{result.get('hash') or '（未知）'}")
+    files = list(result.get("files") or [])
+    if files:
+        lines.append(f"- 改动文件：{_join_names(files)}")
+    lines.append("下一轮对话就会用回退后的记忆。")
+    return "\n".join(lines)

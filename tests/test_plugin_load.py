@@ -48,6 +48,8 @@ def test_plugin_registers_commands_and_hooks():
         "astral",
         "astral_status",
         "astral_clean",
+        "astral_commit",
+        "astral_recover",
         "astral_memory",
         "astral_memory_show",
         "inject_memory_snapshot",
@@ -59,6 +61,34 @@ def test_plugin_registers_commands_and_hooks():
     assert status_handler.event_type.name == "AdapterMessageEvent"
     hook = handlers["inject_memory_snapshot"]
     assert hook.event_type.name == "OnLLMRequestEvent"
+
+
+def test_version_commands_have_alias_and_admin_filter():
+    core = _core_dir()
+    if str(core) not in sys.path:
+        sys.path.insert(0, str(core))
+    module = importlib.import_module("data.plugins.astrbot_plugin_astral.main")
+
+    from astrbot.core.star.filter.command import CommandFilter
+    from astrbot.core.star.filter.permission import PermissionType, PermissionTypeFilter
+    from astrbot.core.star.star_handler import star_handlers_registry
+
+    handlers = {
+        handler.handler_name: handler
+        for handler in star_handlers_registry.get_handlers_by_module_name(module.__name__)
+    }
+
+    names: set[str] = set()
+    for item in handlers["astral_commit"].event_filters:
+        if isinstance(item, CommandFilter):
+            names.update(item.get_complete_command_names())
+    assert {"astral commit", "astral save"} <= names
+
+    assert any(
+        isinstance(item, PermissionTypeFilter)
+        and item.permission_type == PermissionType.ADMIN
+        for item in handlers["astral_recover"].event_filters
+    )
 
 
 def test_metadata_matches_spec():

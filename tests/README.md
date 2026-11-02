@@ -23,9 +23,11 @@ Set-Location <插件目录>
 
 | 层 | 用例 | 依赖 |
 | --- | --- | --- |
-| 纯函数 | `test_config.py`、`test_store.py`、`test_templates.py`、`test_snapshot.py`、`test_views_contract.py` | 仅标准库 |
+| 纯函数 | `test_config.py`、`test_store.py`、`test_templates.py`、`test_snapshot.py`、`test_views_contract.py`、`test_versioning.py` | 仅标准库；`test_versioning.py` 额外调用真实 `git`（缺失时整组跳过） |
 | 补丁 | `test_ws_shared.py` | 真实 `astrbot.core.workspace` |
 | 坐标回归 | `test_coordinates.py` | 真实 AstrBot 源码树（`ASTRBOT_SOURCE`） |
 | 装配 | `test_main_hooks.py` | 真实 `astrbot` + 假 Context |
 
 `test_templates.py` 的模板逐字比对依赖维护者本地的 `specs/`；该目录不随仓库发布，缺失时相关用例自动跳过。
+
+`test_versioning.py` 会真实调用系统 Git（经 `subprocess`，无 shell），机器上没有 Git 时整个模块跳过，其余用例不受影响。
