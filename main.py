@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import functools
 import hashlib
-import logging
 from pathlib import Path
 from typing import Any
 
+from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star
 
@@ -36,8 +36,6 @@ else:  # pragma: no cover - direct import for tests
     import store as store_mod
     import webapi as webapi_mod
     import ws_shared
-
-logger = logging.getLogger("astrbot")
 
 
 class AstralPlugin(Star):

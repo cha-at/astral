@@ -4,14 +4,13 @@ The repository lives at <shared_root>/.git and tracks only the four content
 files listed by store.PROTECTED_FILES. Everything else is excluded through
 .git/info/exclude for repositories created by this plugin. All git calls use
 argv (no shell), a fixed identity, no hooks, no signing, no network and a
-timeout. The module is pure standard library so it can be tested without an
-AstrBot runtime.
+timeout. The module has no third-party dependencies; log records go through
+AstrBot's logger.
 """
 
 from __future__ import annotations
 
 import json
-import logging
 import os
 import re
 import shutil
@@ -21,14 +20,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from astrbot.api import logger
+
 if __package__:
     from . import store as store_mod
     from . import templates as templates_mod
 else:  # pragma: no cover - direct import for tests
     import store as store_mod
     import templates as templates_mod
-
-logger = logging.getLogger("astrbot")
 
 TRACKED_FILES: tuple[str, ...] = tuple(store_mod.PROTECTED_FILES)
 GIT_TIMEOUT_SECONDS = 20.0

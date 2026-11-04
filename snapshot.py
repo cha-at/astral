@@ -1,9 +1,9 @@
 """Render the frozen per-conversation Astral memory snapshot.
 
-Pure standard-library module: no network, no database, no writes to disk. The
-only side effects are read-only file access and log records. Any unexpected
-failure degrades to a tiny block so an LLM request never fails because of the
-snapshot (spec FR-3, NFR-7).
+No third-party dependencies beyond AstrBot's logger: no network, no database,
+no writes to disk. The only side effects are read-only file access and log
+records. Any unexpected failure degrades to a tiny block so an LLM request
+never fails because of the snapshot (spec FR-3, NFR-7).
 
 The rendered block is written for the model, not for a maintainer: it reads as
 "here is who you are and what you remember", carries no file lengths, no
@@ -13,14 +13,13 @@ hold notes for humans.
 
 from __future__ import annotations
 
-import logging
 import re
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-logger = logging.getLogger("astrbot")
+from astrbot.api import logger
 
 # Fixed header / footer text. Keep them as constants so tests can assert on
 # them and a v1 -> v2 upgrade is a one-line change.

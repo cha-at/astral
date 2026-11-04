@@ -1,7 +1,8 @@
 """Tests for versioning.py (system Git, four memory files).
 
-The module is pure standard library, but the tests need a real git executable.
-The whole module is skipped when git is not installed.
+The module has no third-party dependencies beyond AstrBot's logger, but the
+tests need a real git executable. The whole module is skipped when git is not
+installed.
 """
 
 from __future__ import annotations

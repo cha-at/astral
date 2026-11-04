@@ -23,7 +23,8 @@ Set-Location <插件目录>
 
 | 层 | 用例 | 依赖 |
 | --- | --- | --- |
-| 纯函数 | `test_config.py`、`test_store.py`、`test_templates.py`、`test_snapshot.py`、`test_views_contract.py`、`test_versioning.py` | 仅标准库；`test_versioning.py` 额外调用真实 `git`（缺失时整组跳过） |
+| 审核契约 | `test_review_contract.py` | 仅标准库；静态扫描仓库根 `.py` |
+| 纯函数 | `test_config.py`、`test_store.py`、`test_templates.py`、`test_snapshot.py`、`test_views_contract.py`、`test_versioning.py` | 标准库 + 可导入的 `astrbot.api.logger`；`test_versioning.py` 额外调用真实 `git`（缺失时整组跳过） |
 | 补丁 | `test_ws_shared.py` | 真实 `astrbot.core.workspace` |
 | 坐标回归 | `test_coordinates.py` | 真实 AstrBot 源码树（`ASTRBOT_SOURCE`） |
 | 装配 | `test_main_hooks.py` | 真实 `astrbot` + 假 Context |

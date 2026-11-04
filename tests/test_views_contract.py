@@ -146,6 +146,7 @@ def test_readme_has_required_disclosures() -> None:
         "所有群可见",
         "不能修改内置 WebUI",
         "需要单独备份共享根",
+        "plugin_data/astrbot_plugin_astral",
         "所有平台",
         "monkeypatch",
         "computer_use_runtime",

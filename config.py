@@ -2,7 +2,8 @@
 
 Responsibilities (001 FR-1, FR-2, FR-8):
 
-* turn the raw 'shared_root' option into an absolute Path;
+* turn the raw 'shared_root' option into an absolute Path, defaulting to
+  the plugin data directory (StarTools.get_data_dir);
 * reject dangerous locations instead of silently falling back to a default;
 * create the shared workspace directory skeleton and verify it is writable;
 * normalise the remaining options (001 keys plus the 'memory' and
@@ -13,15 +14,12 @@ The module never touches sys.modules and never installs the patch.
 
 from __future__ import annotations
 
-import logging
 import os
 import sys
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger("astrbot")
-
-DEFAULT_SHARED_RELATIVE: tuple[str, str] = ("workspaces", "astral")
+PLUGIN_NAME = "astrbot_plugin_astral"
 
 SHARED_DIRS: tuple[str, ...] = (
     "skills",
@@ -114,7 +112,11 @@ def _resolve(path: Path) -> Path:
 
 
 def get_data_path() -> Path:
-    """Return the AstrBot data directory (<root>/data)."""
+    """Return the AstrBot data directory (<root>/data).
+
+    Used to locate plugin_data and the safety rule table; the plugin's own
+    default storage directory is resolved through StarTools.get_data_dir().
+    """
     from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
     return _resolve(Path(get_astrbot_data_path()))
@@ -129,26 +131,58 @@ def _data_path_or_default(data_path: Path | None) -> Path:
         return _resolve(Path.cwd() / "data")
 
 
+# The default storage directory must come from StarTools; this helper only
+# computes the canonical path for safety checks, relative resolution and the
+# test-only data_path override, and never creates anything.
+def plugin_data_path(data_path: Path | None = None) -> Path:
+    """Return <data>/plugin_data/astrbot_plugin_astral without creating it.
+
+    Kept separate from get_plugin_data_dir() so safety checks and relative
+    path resolution never create directories as a side effect.
+    """
+    data = _data_path_or_default(data_path)
+    return _resolve(data / "plugin_data" / PLUGIN_NAME)
+
+
+def get_plugin_data_dir() -> Path:
+    """Return the plugin data directory through AstrBot's StarTools.
+
+    AstralPlugin.__init__ runs before AstrBot registers the plugin in
+    star_map, so the plugin name must be passed explicitly instead of letting
+    StarTools detect the caller from the stack.
+    """
+    try:
+        from astrbot.api.star import StarTools
+
+        return _resolve(Path(StarTools.get_data_dir(PLUGIN_NAME)))
+    except Exception:
+        try:
+            from astrbot.core.utils.astrbot_path import get_astrbot_plugin_data_path
+
+            return _resolve(Path(get_astrbot_plugin_data_path()) / PLUGIN_NAME)
+        except Exception:
+            return plugin_data_path()
+
+
 def resolve_shared_root(raw: Any, *, data_path: Path | None = None) -> Path:
     """Resolve the shared_root option into an absolute path (001 FR-1).
 
     Args:
-        raw: Raw option value; empty means <data>/workspaces/astral.
+        raw: Raw option value; empty means the plugin data directory
+            (<data>/plugin_data/astrbot_plugin_astral).
         data_path: AstrBot data directory override, mostly for tests.
 
     Returns:
         Absolute, non-strict resolved path.
     """
-    data = _data_path_or_default(data_path)
     text = _as_str(raw)
     if not text:
-        candidate = data / DEFAULT_SHARED_RELATIVE[0] / DEFAULT_SHARED_RELATIVE[1]
-    elif text.startswith("~"):
-        candidate = Path(text).expanduser()
-    else:
-        candidate = Path(text).expanduser()
-        if not candidate.is_absolute():
-            candidate = data / "workspaces" / candidate
+        if data_path is None:
+            return get_plugin_data_dir()
+        return plugin_data_path(data_path)
+    candidate = Path(text).expanduser()
+    if not candidate.is_absolute():
+        candidate = plugin_data_path(data_path) / candidate
     return _resolve(candidate)
 
 
@@ -207,7 +241,7 @@ def forbidden_rules(
     for item in _as_list(extra):
         candidate = Path(item).expanduser()
         if not candidate.is_absolute():
-            candidate = data / "workspaces" / candidate
+            candidate = plugin_data_path(data_path) / candidate
         rules.append((f"forbidden_roots:{item}", _resolve(candidate), RULE_TREE))
     return rules
 
@@ -235,17 +269,21 @@ def check_forbidden(
 ) -> str | None:
     """Return a user visible reason when root is a forbidden location.
 
-    The AstrBot source rule gets one documented exception: AstrBot keeps its
-    runtime data directory inside the installation directory, so the default
-    shared root (<data>/workspaces/astral) would otherwise reject itself. Roots
-    inside <data> are still guarded by the data/config, data/plugins and
-    data/plugin_data rules plus any user supplied forbidden_roots entry.
+    Two narrow exceptions keep the defaults usable: the AstrBot source rule is
+    skipped for roots inside <data> (AstrBot keeps its runtime data directory
+    inside the installation directory), and the data/plugin_data rule is
+    skipped for the plugin's own data directory. Every other data/config,
+    data/plugins and data/plugin_data path plus user supplied forbidden_roots
+    entries remain rejected.
     """
     resolved = _resolve(Path(root))
     data = _data_path_or_default(data_path)
+    own_data = plugin_data_path(data_path)
     inside_data = _matches(resolved, data, RULE_TREE)
     for label, rule, mode in forbidden_rules(extra, data_path=data):
         if label == "AstrBot source" and inside_data:
+            continue
+        if label == "data/plugin_data" and _matches(resolved, own_data, RULE_TREE):
             continue
         if _matches(resolved, rule, mode):
             return f"forbidden（共享根命中危险路径 {label}）：{resolved}"
@@ -254,10 +292,9 @@ def check_forbidden(
 
 def get_shared_root(cfg: Any, *, data_path: Path | None = None) -> Path:
     """Resolve and validate the shared root; raises ConfigError."""
-    data = _data_path_or_default(data_path)
     conf = cfg if isinstance(cfg, dict) else {}
-    root = resolve_shared_root(conf.get("shared_root"), data_path=data)
-    reason = check_forbidden(root, conf.get("forbidden_roots"), data_path=data)
+    root = resolve_shared_root(conf.get("shared_root"), data_path=data_path)
+    reason = check_forbidden(root, conf.get("forbidden_roots"), data_path=data_path)
     if reason:
         raise ConfigError(reason)
     return root

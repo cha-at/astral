@@ -3,8 +3,9 @@
 Covers shared root resolution and creation, forbidden roots and directory
 tree creation.
 
-Every test passes an explicit ``data_path`` so nothing is ever written into
-the real AstrBot data directory.
+Every test passes an explicit ``data_path`` except the default-path pin,
+which relies on the temporary ``ASTRBOT_ROOT`` set by conftest.py; nothing is
+ever written into the real AstrBot data directory.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ import config
 
 def test_module_constants_and_defaults():
     """Pin the public constants so downstream modules can rely on them."""
-    assert tuple(config.DEFAULT_SHARED_RELATIVE) == ("workspaces", "astral")
+    assert config.PLUGIN_NAME == "astrbot_plugin_astral"
     assert tuple(config.SHARED_DIRS) == (
         "skills",
         "shared",
@@ -49,10 +50,10 @@ def test_config_error_carries_reason():
 
 @pytest.mark.parametrize("raw", [None, "", "   "])
 def test_resolve_default_root(tmp_path, raw):
-    """AC-1.1: empty config resolves to <data>/workspaces/astral."""
+    """AC-1.1: empty config resolves to <data>/plugin_data/<plugin>."""
     data_path = tmp_path / "data"
     assert config.resolve_shared_root(raw, data_path=data_path) == (
-        data_path / "workspaces" / "astral"
+        data_path / "plugin_data" / config.PLUGIN_NAME
     ).resolve()
 
 
@@ -72,19 +73,34 @@ def test_resolve_tilde_root(tmp_path):
 
 
 def test_resolve_relative_root(tmp_path):
-    """AC-1.4: relative paths are rooted under <data>/workspaces."""
+    """AC-1.4: relative paths are rooted under the plugin data directory."""
     data_path = tmp_path / "data"
     assert config.resolve_shared_root("myws", data_path=data_path) == (
-        data_path / "workspaces" / "myws"
+        data_path / "plugin_data" / config.PLUGIN_NAME / "myws"
     ).resolve()
 
 
 def test_resolve_default_uses_astrbot_data_path_when_omitted():
-    """Without data_path the AstrBot data directory is used as the base."""
-    from astrbot.core.utils.astrbot_path import get_astrbot_data_path
+    """Without data_path the default comes from StarTools.get_data_dir()."""
+    from astrbot.api.star import StarTools
 
-    expected = (Path(get_astrbot_data_path()) / "workspaces" / "astral").resolve()
+    expected = Path(StarTools.get_data_dir(config.PLUGIN_NAME)).resolve()
     assert config.resolve_shared_root(None) == expected
+
+
+def test_get_plugin_data_dir_uses_startools():
+    """The default data directory is exactly StarTools.get_data_dir(...)."""
+    from astrbot.api.star import StarTools
+
+    expected = Path(StarTools.get_data_dir(config.PLUGIN_NAME)).resolve()
+    assert config.get_plugin_data_dir() == expected
+    assert config.resolve_shared_root(None) == expected
+
+
+def test_plugin_data_path_respects_data_path_override(tmp_path):
+    data_path = tmp_path / "data"
+    expected = (data_path / "plugin_data" / config.PLUGIN_NAME).resolve()
+    assert config.plugin_data_path(data_path) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +128,19 @@ def test_forbidden_sensitive_data_directories(tmp_path):
             reason = config.check_forbidden(data_path / relative / suffix, data_path=data_path)
             assert reason is not None
             assert "forbidden" in reason.lower()
+
+
+def test_own_plugin_data_dir_is_allowed(tmp_path):
+    """The plugin's own data directory is the one plugin_data exception."""
+    data_path = tmp_path / "data"
+    own = data_path / "plugin_data" / config.PLUGIN_NAME
+    assert config.check_forbidden(own, data_path=data_path) is None
+    assert config.check_forbidden(own / "sub", data_path=data_path) is None
+
+    other = data_path / "plugin_data" / "other_plugin"
+    reason = config.check_forbidden(other, data_path=data_path)
+    assert reason is not None
+    assert "data/plugin_data" in reason
 
 
 def test_forbidden_home_secret_directories(tmp_path):
@@ -196,10 +225,10 @@ def test_valid_roots_are_not_forbidden(tmp_path):
 def test_get_shared_root_resolves_valid_config(tmp_path):
     data_path = tmp_path / "data"
     assert config.get_shared_root(None, data_path=data_path) == (
-        data_path / "workspaces" / "astral"
+        data_path / "plugin_data" / config.PLUGIN_NAME
     ).resolve()
     assert config.get_shared_root({"shared_root": "myws"}, data_path=data_path) == (
-        data_path / "workspaces" / "myws"
+        data_path / "plugin_data" / config.PLUGIN_NAME / "myws"
     ).resolve()
 
 

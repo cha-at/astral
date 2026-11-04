@@ -9,9 +9,10 @@ command handlers in main.py stay thin.
 from __future__ import annotations
 
 import asyncio
-import logging
 from pathlib import Path
 from typing import Any
+
+from astrbot.api import logger
 
 if __package__:
     from . import state as state_mod
@@ -21,8 +22,6 @@ else:  # pragma: no cover - direct import for tests
     import state as state_mod
     import store as store_mod
     import versioning
-
-logger = logging.getLogger("astrbot")
 
 HELP_TEXT = """Astral · 让我记住群里的事
 /astral status —— 我现在记了多少、有没有生效

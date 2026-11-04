@@ -1,7 +1,7 @@
 """Seed templates and EXTRA_PROMPT managed-section maintenance.
 
-This module is intentionally standard-library only: the plugin imports it at
-load time and the unit tests import it without an AstrBot runtime.
+This module uses the standard library plus AstrBot's logger; it has no other
+third-party dependencies.
 
 Only EXTRA_PROMPT.md has a program-managed region. SOUL.md, MEMORY.md and
 AGENTS.md are written once (when missing or blank) and never touched again.
@@ -9,11 +9,10 @@ AGENTS.md are written once (when missing or blank) and never touched again.
 
 from __future__ import annotations
 
-import logging
 import os
 from pathlib import Path
 
-logger = logging.getLogger("astrbot")
+from astrbot.api import logger
 
 SEED_MARKER = "<!-- astral:seeded:v1 -->"
 MANAGED_BEGIN = "<!-- astral:managed:begin -->"

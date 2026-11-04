@@ -6,7 +6,7 @@
 
 | 模块 | 职责 | 不做什么 |
 | --- | --- | --- |
-| `config.py` | `shared_root` 解析（默认 / `~` / 相对 / 绝对）、危险路径黑名单、`ensure_shared_tree()` 建目录骨架并校验可写、配置项归一化（含 `memory` 与 `version_control` 分组） | 不装补丁、不写业务文件 |
+| `config.py` | `shared_root` 解析（默认 `StarTools.get_data_dir("astrbot_plugin_astral")` / `~` / 相对 / 绝对）、危险路径黑名单（放行本插件 plugin_data 目录）、`ensure_shared_tree()` 建目录骨架并校验可写、配置项归一化（含 `memory` 与 `version_control` 分组） | 不装补丁、不写业务文件 |
 | `ws_shared.py` | 补丁核心：4 个解析函数替换、双写消费者、幂等安装、还原、状态（`install` / `uninstall` / `status` / `originals`） | 不读配置、不建目录、不写盘 |
 | `store.py` | `.astral/state.json`、`.astral/audit.jsonl`、共享根体积统计与配额、`/astral clean` 的移动归档 | 不关心补丁 |
 | `versioning.py` | 本地 Git 版本历史：`find_git` / `ensure_repo` / `commit` / `list_versions` / `recover` / `summary`；固定 `-c` 配置与提交身份，subprocess 无 shell | 不渲染聊天文案、不读插件配置 |
@@ -21,7 +21,7 @@
 数据流：
 
 ```text
-插件加载  __init__  : lifecycle.install_patch → (config.get_shared_root → ensure_shared_tree → ws_shared.install) → webapi 注册
+插件加载  __init__  : lifecycle.install_patch → (config.get_shared_root（默认 plugin_data）→ ensure_shared_tree → ws_shared.install) → webapi 注册
 插件加载  initialize: templates.seed_workspace → templates.sync_managed_section → versioning.ensure_repo（仅 enabled；找不到 git 时记录警告并跳过）→ audit/state.json
 每轮对话  on_llm_request: (umo, cid) 查 SnapshotCache；未命中 → snapshot.render → 追加到 req.system_prompt
 存档      /astral commit|save: commands.save_memory → versioning.commit → state.version_commit_text
@@ -38,6 +38,9 @@ check_forbidden(root, extra=None, *, data_path=None) -> str | None      # 命中
 get_shared_root(cfg, *, data_path=None) -> Path                        # 失败抛 ConfigError(reason)
 ensure_shared_tree(root) -> list[str]                                  # 失败抛 ConfigError
 read_options(cfg) -> dict; memory_options(cfg) -> dict; version_control_options(cfg) -> dict
+PLUGIN_NAME = "astrbot_plugin_astral"
+plugin_data_path(data_path=None) -> Path      # <data>/plugin_data/<PLUGIN_NAME>，不建目录
+get_plugin_data_dir() -> Path                 # StarTools.get_data_dir(PLUGIN_NAME)，默认共享根
 
 # ws_shared.py
 install(root, *, patch_project=True, scan_modules=True) -> dict
@@ -76,6 +79,13 @@ SnapshotCache(maxsize=64).get_or_render(key, render_fn) -> (block, hit)
 
 `state.build_state()` 载荷新增 `versioning`（`enabled`/`available`/`initialized`/`git`/`head`/`count`/`dirty`/`last`/`reason`），`/astral status` 在记忆概况之后追加版本行与「保存 / 回退」提示；关闭时显示「记忆版本：已关闭」，找不到 Git 时显示「不可用（原因）」。
 
+### 2.1 审核契约（改动时必须保持）
+
+- **日志**：所有记录日志的模块统一 `from astrbot.api import logger`，禁止 `logging.getLogger`；AstrBot 会按调用模块把日志路由到 `astrbot.plugin.astrbot_plugin_astral`。
+- **数据目录**：默认共享根 = `StarTools.get_data_dir("astrbot_plugin_astral")` = `<data>/plugin_data/astrbot_plugin_astral`；`data/plugin_data` 黑名单只放行本插件目录，兄弟插件目录仍拒绝。
+- **为什么显式传插件名**：`AstralPlugin.__init__` 早于 `star_map` 注册，不能依赖 `StarTools.get_data_dir()` 的调用栈自动识别。
+- **回归**：`tests/test_review_contract.py` 静态扫描上述两条规则。
+
 注入块形状（改动时同步 `tests/test_snapshot.py`）：
 
 ```text
@@ -103,7 +113,7 @@ $env:ASTRBOT_ROOT = "$env:TEMP\astral-testroot"
 
 | 文件 | 覆盖 |
 | --- | --- |
-| `test_config.py` / `test_config_regression.py` | 共享根 4 种形态、黑名单（含「AstrBot 源码目录内、但位于 `<data>` 下的默认根必须放行」这条回归）、目录骨架幂等、配置项回落 |
+| `test_config.py` / `test_config_regression.py` | 共享根 4 种形态、黑名单（含「默认根位于 `<data>/plugin_data/<插件名>` 必须放行」「兄弟插件数据目录必须拒绝」两条回归）、目录骨架幂等、配置项回落 |
 | `test_ws_shared.py` | 双写、负对照（`scan_modules=False`）、幂等、还原、缺函数显式失败 |
 | `test_store.py` | state.json、audit JSONL、配额告警、移动归档 |
 | `test_versioning.py` | 仓库初始化/marker/exclude、只提交四份文件、CRLF 与非 UTF-8、符号链接/目录/超大文件拒绝、版本列表、回退追加式与拒绝场景、adopted 仓库；需要真实 `git`，缺失时整组跳过 |
@@ -113,14 +123,15 @@ $env:ASTRBOT_ROOT = "$env:TEMP\astral-testroot"
 | `test_plugin_load.py` | 以 `data.plugins.astrbot_plugin_astral.main` 包路径导入并检查指令/钩子注册 |
 | `test_coordinates.py` | 4 个函数签名、3 个消费者仍为顶层 import、桩版本漂移检测 |
 | `test_views_contract.py` | 只读页静态契约与 README/CHANGELOG 必含内容 |
+| `test_review_contract.py` | 审核静态契约：根目录模块禁止 `logging.getLogger`，要求 `astrbot.api.logger` 与 `StarTools.get_data_dir` |
 
-当前基线：`pytest tests -q` → 202 passed / 3 skipped（符号链接等用例在 Windows 上跳过）。
+当前基线：`pytest tests -q` → 212 passed / 3 skipped（符号链接等用例在 Windows 上跳过）。
 
 ## 4. 真实实例验收（AstrBot 4.29.4 @ `831abae85`）
 
 在本地实例上重载插件后实测：
 
-- `state` 200：`installed=true`、`shared_root` 为默认 `<data>/workspaces/astral`、`consumers.resolve_workspace_root_for_umo` 含 `astrbot.core.astr_main_agent` 与 `astrbot.core.tools.computer_tools.util`、`consumers.resolve_project_workspace_root` 含 `astrbot.dashboard.services.chatui_project_service`。
+- `state` 200：`installed=true`、`shared_root` 为默认路径（审核修复后为 `<data>/plugin_data/astrbot_plugin_astral`，历史实测时为 `<data>/workspaces/astral`）、`consumers.resolve_workspace_root_for_umo` 含 `astrbot.core.astr_main_agent` 与 `astrbot.core.tools.computer_tools.util`、`consumers.resolve_project_workspace_root` 含 `astrbot.dashboard.services.chatui_project_service`。
 - 四份文件播种成功（`seeded_version=1`），`.astral/state.json` 与 `.astral/audit.jsonl` 生成，目录骨架齐全。
 - `files` 200；`?name=SOUL` 200 且正文与磁盘一致；`?name=../../etc/passwd` → 400 `unknown_name`。
 - 停用插件 → `state`、`files`、`clean` 全部 503（`installed=false`、`consumers` 为空、`message`/`reason` 可读）；重新启用 → 200 且 `installed=true`。这一步同时验证了「停用即还原」与「停用后端点自检」。
@@ -143,6 +154,7 @@ $env:ASTRBOT_ROOT = "$env:TEMP\astral-testroot"
 - 回退会还原 `EXTRA_PROMPT.md` 的字节，但 Astral 托管区段会在下次插件加载时按当前模板重写；回退的是托管区段之外的正文。
 - `versioning.py` 的锁是进程内 `RLock`；多进程部署下并发 commit/recover 可能撞 `.git/index.lock`，与「不支持多进程」的限制一致。
 - Git 提交身份固定为 `Astral <astral@localhost>`，不区分操作者。
+- 默认共享根在 `data/plugin_data/astrbot_plugin_astral`；旧默认 `<data>/workspaces/astral` 不自动迁移，升级时需手工复制或显式配置 `shared_root`。
 
 ### 升级回归清单
 
@@ -153,4 +165,5 @@ AstrBot 升级后：
 3. `tests/test_coordinates.py` 通过（四个解析函数存在且签名一致）；
 4. `on_llm_request` 注入仍生效，快照出现在 system prompt 末尾；
 5. 配置开启且机器有 Git 时，`<共享根>/.git` 存在、`git log` 有基线或检查点，`/astral status` 出现「记忆版本」行；`/astral recover <短哈希>` 后四份文件与目标版本一致；
-6. 漂移时 `state.reason` 显示缺失函数名，停用插件即回滚。
+6. 漂移时 `state.reason` 显示缺失函数名，停用插件即回滚；
+7. `StarTools.get_data_dir` 与 `astrbot.api.logger` 仍存在，默认数据目录仍为 `data/plugin_data/<插件名>`，`tests/test_review_contract.py` 通过。

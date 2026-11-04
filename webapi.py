@@ -8,7 +8,6 @@ disabled plugin must answer 503 instead of exposing stale data (001 FR-10).
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import Any
 
@@ -18,8 +17,6 @@ if __package__:
     from . import templates as templates_mod
 else:  # pragma: no cover - direct import for tests
     import templates as templates_mod
-
-logger = logging.getLogger("astrbot")
 
 ROUTE_STATE = "/astrbot_plugin_astral/state"
 ROUTE_FILES = "/astrbot_plugin_astral/files"

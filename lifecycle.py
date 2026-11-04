@@ -7,9 +7,10 @@ here takes the plugin instance and mutates its documented attributes only.
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import Any
+
+from astrbot.api import logger
 
 if __package__:
     from . import config as config_mod
@@ -25,8 +26,6 @@ else:  # pragma: no cover - direct import for tests
     import templates as templates_mod
     import versioning
     import ws_shared
-
-logger = logging.getLogger("astrbot")
 
 
 def install_patch(plugin: Any) -> None:

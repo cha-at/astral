@@ -15,14 +15,13 @@ configuration and never creates directories.
 from __future__ import annotations
 
 import importlib
-import logging
 import sys
 from datetime import datetime
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Callable
 
-logger = logging.getLogger("astrbot")
+from astrbot.api import logger
 
 BASELINE: dict[str, str] = {"astrbot": "4.29.4", "commit": "831abae85"}
 TARGET_MODULE = "astrbot.core.workspace"

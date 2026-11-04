@@ -7,11 +7,12 @@ and the shared root, then returns plain data or Chinese text.
 
 from __future__ import annotations
 
-import logging
 import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from astrbot.api import logger
 
 if __package__:
     from . import store as store_mod
@@ -21,8 +22,6 @@ else:  # pragma: no cover - direct import for tests
     import store as store_mod
     import versioning
     import ws_shared
-
-logger = logging.getLogger("astrbot")
 
 MEMORY_SHOW_PRIVATE_LIMIT = 3000
 

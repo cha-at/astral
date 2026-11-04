@@ -67,15 +67,33 @@ Bot：你们固定周五晚八点开黑，别撞车。
 | 看得见它记了什么 | 聊天里 `/astral memory show`、插件只读页，都能看到"它到底记了什么"；插件页没有任何写入口 |
 | 可观测、可回滚 | `/astral status` 与 `GET .../state` 给出生效状态、记忆目录、版本检查点与失败原因；有系统 Git 时可用 `/astral commit` 存档、`/astral recover` 回退（见[记忆版本控制](#记忆版本控制可选需要系统-git)）；停用插件即恢复原生"按会话分目录"的行为 |
 
+## 它不能干什么
+
+先看这张表，免得装完失望：
+
+| 限制 | 说明 |
+| --- | --- |
+| 不能修改内置 WebUI | Astral 不能给 AstrBot 内置 WebUI 加按钮、加标签页，也不能替换“工作区文件”面板；Astral 只有自己的插件页（WebUI → 插件 → Astral） |
+| 不改 AstrBot 源码 | 全部通过运行期 monkeypatch 包装工作区解析函数实现；插件目录之外的代码零改动，停用插件即还原 |
+| 安全影响（monkeypatch） | 接管 `resolve_project_workspace_root` 会让 AstrBot 针对 API-key 项目与 custom workspace 的越界校验不再生效；只在受信任的实例上使用，并绑定兼容窗口（见下一行） |
+| 兼容 AstrBot 4.27.0 – 4.x | 补丁绑定的工作区解析入口自 4.27.0 起未变，但只在 4.29.4 上完整实测；低于 4.27.0 或 5.x 在插件市场显示“不支持”，升级 AstrBot 后要按[升级与备份](#升级与备份)一节回归 |
+| 不支持多进程 | 补丁只在各自进程内生效；多 worker 部署下各进程各打各的补丁，行为无法保证 |
+| `computer_use_runtime=sandbox` 时工作区不参与 Agent 执行 | Agent 在容器内的 `/workspace` 里干活，与宿主机共享根无关；`/astral status` 会提示 |
+| 没有文件上传与在线编辑 | 插件页只读；写文件请用聊天里的文件工具，或直接编辑共享根下的文件 |
+| 版本历史只覆盖四份内容文件 | `/astral recover` 只还原 `SOUL.md`、`MEMORY.md`、`AGENTS.md`、`EXTRA_PROMPT.md`；`skills/`、`shared/`、`memory/`、`archive/`、`.astral/` 不在版本控制内。默认共享根在 `plugin_data` 内会随官方备份；自定义共享根仍需整目录备份 |
+| 没有系统 Git 就没有版本控制 | 记忆读写不依赖 Git；找不到 Git 时 `/astral commit` 与 `/astral recover` 提示不可用，装好 Git 或填 `version_control.git_path` 后重载插件即可 |
+| 版本历史不是隐私擦除工具 | Git 历史会保留已删除内容的旧版本；从文件里删掉的敏感信息仍留在历史提交里，要彻底移除需先备份再删除 `<共享根>/.git` |
+| 全局共享 = 跨群可见 | 隐私边界靠披露与守则约束，不做访问控制，详见[隐私披露](#隐私披露) |
+
 ## 配置说明
 
 配置在 AstrBot WebUI 的**插件配置页**修改；保存后**重载插件**生效（共享根解析、目录骨架、播种、托管区段同步与补丁安装都在插件加载时执行）。
 
 | 配置项 | 含义 | 默认值 | 注意点 |
 | --- | --- | --- | --- |
-| `shared_root` | 共享根目录 | 空字符串：落在 AstrBot 数据目录的 `workspaces/astral` | 大多数情况不用改。支持 `~` 与相对路径（相对数据目录的 `workspaces`）；命中危险路径黑名单会拒绝安装，不会回落到默认目录 |
+| `shared_root` | 共享根目录 | 空字符串：`<data>/plugin_data/astrbot_plugin_astral`（AstrBot 规范插件数据目录） | 大多数情况不用改。支持 `~` 与相对路径（相对插件数据目录）；命中危险路径黑名单会拒绝安装，不会回落到默认目录 |
 | `patch_webchat_projects` | 是否同时接管 webchat 项目的工作区解析（Dashboard"工作区文件"面板） | `true` | 设为 `false` 后面板显示项目自己的目录、Agent 仍在共享根，两者不一致，`/astral status` 会明示 |
-| `forbidden_roots` | 额外禁止的共享根前缀 | 空列表 | 默认已禁止 AstrBot 源码、数据敏感区（`config`/`plugins`/`plugin_data`）、用户主目录敏感区与系统目录；位于 `<data>` 子树内的默认根对"AstrBot 源码"规则例外（否则默认根会拒绝自己），但 `data/config`、`data/plugins`、`data/plugin_data` 仍单独禁止 |
+| `forbidden_roots` | 额外禁止的共享根前缀 | 空列表 | 默认已禁止 AstrBot 源码、数据敏感区（`config`/`plugins`/`plugin_data`）、用户主目录敏感区与系统目录；本插件自己的 `data/plugin_data/astrbot_plugin_astral` 是唯一例外，其他插件数据目录仍禁止。相对路径以插件数据目录为基准 |
 | `quota_gb` | 共享根体积告警阈值（GB） | `0`（不限制） | 超限只在 `/astral status` 与状态接口给 warn，**不自动删除**任何文件 |
 | `memory.enabled` | 是否在对话开始时注入记忆快照 | `true` | 关闭后不注入，播种与只读页不受影响 |
 | `memory.soul_budget_chars` | `SOUL.md` 的单次注入预算（字符） | `4000` | 超预算只截断快照，不改文件；完整内容用文件工具读取 |
@@ -107,7 +125,7 @@ Bot：你们固定周五晚八点开黑，别撞车。
 
 ```text
 Astral 已生效 ✅
-- 记忆目录：C:\AstrBot\data\workspaces\astral
+- 记忆目录：C:\AstrBot\data\plugin_data\astrbot_plugin_astral
 - 记忆概况：SOUL 620 字 / MEMORY 12 条（1.8k 字），最近 11-01 20:26 更新
 - 记忆版本：3 个检查点，最新 a1b2c3d（11-01 20:26）
 - 保存 / 回退：/astral commit · /astral recover
@@ -160,6 +178,8 @@ Astral 可以把四份记忆文件像代码一样存档：每次保存是一个�
 
 ## 共享根目录结构
 
+默认位置：`<data>/plugin_data/astrbot_plugin_astral/`（AstrBot 规范插件数据目录；实际路径以 `/astral status` 为准）。
+
 ```text
 <共享根>/
 ├─ SOUL.md             # 它是谁、怎么说话、底线（每对话注入）
@@ -186,27 +206,30 @@ Astral 可以把四份记忆文件像代码一样存档：每次保存是一个�
 - 需要删除记忆时，让 Agent 直接编辑文件删除对应条目并回报删了几行；没有独立回收站，备份就是回滚点。
 - **Git 历史会保留删除前的内容。** 记忆版本控制开启后，每次 `/astral commit` / `/astral recover` 都是本地提交；从文件里删掉的条目仍然存在于历史提交中。它不是隐私擦除工具；要彻底移除历史，先备份再删除 `<共享根>/.git` 重建。
 - Astral 不自动扫描敏感信息，也不加密、不做访问控制；是否写入由你和 Agent 遵守的守则判断。
+- **卸载插件时勾选「同时删除数据」会删除默认共享根**（`data/plugin_data/astrbot_plugin_astral`）；需要保留记忆就先备份，或卸载时不要勾选「同时删除数据」。
 
 ## 升级与备份
 
-**需要单独备份共享根。** AstrBot 官方的"维护 → 备份"覆盖配置、插件与数据库等数据，但**不包含共享根里的工作区文件**；只做官方备份会丢掉全部工作区与记忆。
+**默认位置会随 AstrBot 官方备份一起备份；自定义共享根需要单独备份共享根。** 默认共享根是 `<data>/plugin_data/astrbot_plugin_astral`，AstrBot 的「维护 → 备份」会包含整个 `plugin_data`；如果你把 `shared_root` 改到 `<data>` 之外，官方备份不会包含它，需要单独备份共享根。
 
-PowerShell 备份（把共享根整目录复制到备份盘）：
+PowerShell 备份（默认位置；把共享根整目录复制到备份盘）：
 
 ```powershell
 # 共享根路径以 /astral status 显示的「记忆目录」为准
-Copy-Item -Recurse -Force "C:\AstrBot\data\workspaces\astral" "D:\backup\astral-20261102"
+Copy-Item -Recurse -Force "C:\AstrBot\data\plugin_data\astrbot_plugin_astral" "D:\backup\astral-20261102"
 ```
 
 PowerShell 恢复（先停用插件，避免恢复过程中被写入）：
 
 ```powershell
-Copy-Item -Recurse -Force "D:\backup\astral-20261102\*" "C:\AstrBot\data\workspaces\astral"
+Copy-Item -Recurse -Force "D:\backup\astral-20261102\*" "C:\AstrBot\data\plugin_data\astrbot_plugin_astral"
 ```
 
-迁移到新机器：先在新机器配置好 `shared_root`，重启让插件建好目录骨架，再把备份内容拷回共享根并重启。对话快照是进程内内存态：同一进程内冻结，改文件后要 `/new` 才刷新；重启或重载插件后缓存清空，已有对话下一轮会按当前文件重建一次。
+迁移到新机器：默认位置随官方备份/恢复走；如果用的是自定义 `shared_root`，先在新机器配置好 `shared_root`，重启让插件建好目录骨架，再把备份内容拷回共享根并重启。对话快照是进程内内存态：同一进程内冻结，改文件后要 `/new` 才刷新；重启或重载插件后缓存清空，已有对话下一轮会按当前文件重建一次。
 
 共享根里的 `.git/` 会随整目录备份一起复制，记忆版本历史也在备份里；换机器时整目录拷回即可继续使用。备份前建议先发一次 `/astral commit`，把当前记忆存成明确版本。
+
+**从旧默认位置升级**：旧版本默认把共享根放在 `<data>/workspaces/astral`，本版不会自动迁移。把旧目录内容（包括隐藏的 `.astral/` 与 `.git/`）复制到 `<data>/plugin_data/astrbot_plugin_astral` 后重载插件；或者把 `shared_root` 显式指回旧目录。旧目录保留不动，确认新位置正常后再自行删除。
 
 升级 AstrBot 之后：
 
@@ -219,6 +242,9 @@ Copy-Item -Recurse -Force "D:\backup\astral-20261102\*" "C:\AstrBot\data\workspa
 
 | 问题 | 回答 |
 | --- | --- |
+| 记忆文件现在存在哪？ | 默认在 `<data>/plugin_data/astrbot_plugin_astral/`，用 `/astral status` 看实际路径；AstrBot 官方备份会包含它。自定义 `shared_root` 时以配置为准。 |
+| 从旧版本升级，记忆不见了？ | 旧默认位置 `<data>/workspaces/astral` 不会自动迁移。把旧目录内容复制到新默认目录，或把 `shared_root` 指回旧目录，然后重载插件。 |
+| 卸载插件会删记忆吗？ | 卸载时勾选「同时删除数据」会删除 `data/plugin_data/astrbot_plugin_astral`；不勾选则保留。 |
 | 它说"记下了"，但 `MEMORY.md` 里没有？ | 九成是 Computer Use 运行时没设成本机环境（默认 `none`），Bot 没有文件工具。按[装完三步](#装完三步)第 ② 步改完并重载插件。 |
 | 改了 `SOUL.md` / `MEMORY.md`，为什么这一轮对话没变化？ | 快照在对话开始时冻结，本轮不刷新。改完文件后要 `/new` 开新对话才会加载新内容。 |
 | 记忆写错或删错了怎么办？ | 先看 `/astral recover` 的历史列表，管理员用 `/astral recover <短哈希>` 回退。回退前会自动保存当前状态，所以回退本身也能再回退。 |
@@ -255,7 +281,8 @@ Set-Location "C:\AstrBot\data\plugins\astrbot_plugin_astral"
 | 用例文件 | 覆盖内容 |
 | --- | --- |
 | `tests/test_views_contract.py` | 只读页静态契约（无写入口、无注入、只调两个 GET、横幅披露）与 README 必含内容 |
-| `tests/test_config.py`、`tests/test_config_regression.py` | 共享根解析规则、危险路径黑名单、默认根位于安装目录内时的放行回归 |
+| `tests/test_review_contract.py` | 审核静态契约：禁止 `logging.getLogger`、要求 `astrbot.api.logger` 与 `StarTools.get_data_dir` |
+| `tests/test_config.py`、`tests/test_config_regression.py` | 共享根解析规则、危险路径黑名单、默认根位于 plugin_data 时的放行与兄弟目录拒绝回归 |
 | `tests/test_ws_shared.py` | 4 个函数的补丁、双写（含负对照）、幂等安装与还原 |
 | `tests/test_store.py` | `.astral/` 状态与审计写入、配额告警、移动归档 |
 | `tests/test_templates.py` | 四份默认模板（与 plan 逐字比对）、托管区段重写与原子写 |
@@ -271,10 +298,10 @@ Set-Location "C:\AstrBot\data\plugins\astrbot_plugin_astral"
 以下结果在 AstrBot 4.29.4 实例上实测（2026-11-02）：
 
 - 插件页返回 200，顶部有"全局共享"横幅，页面只调用 `state` 与 `files` 两个 GET。
-- `GET .../state` → 200，`installed=true`；`GET .../files` → 200，`?name=SOUL` 含 `content`，`?name=../../etc/passwd` → 400 `unknown_name`。
+- `GET .../state` → 200，`installed=true`；`shared_root` 为默认路径（审核修复后为 `<data>/plugin_data/astrbot_plugin_astral`，历史实测时为 `<data>/workspaces/astral`）；`GET .../files` → 200，`?name=SOUL` 含 `content`，`?name=../../etc/passwd` → 400 `unknown_name`。
 - 停用插件后 `state` → 503 且 `installed=false`；重新启用 → 200 且 `installed=true`。
 - 群里 `/astral status` 输出生效状态与记忆概况；`/astral memory show` 私聊给全文、群聊只给元信息与前 3 行。
-- 全量 `pytest tests -q` = 202 passed / 3 skipped（符号链接等用例在 Windows 上跳过）。
+- 全量 `pytest tests -q` = 212 passed / 3 skipped（符号链接等用例在 Windows 上跳过）。
 
 记忆版本控制（未发布，待真实实例复核）：
 

@@ -4,6 +4,14 @@
 
 ## 未发布
 
+### 审核修复
+
+- **日志**：所有记录日志的模块改用 `from astrbot.api import logger`，删除 `logging.getLogger("astrbot")`；AstrBot 会按调用位置路由到 `astrbot.plugin.astrbot_plugin_astral`，插件日志等级可在 WebUI 单独调整。
+- **默认数据目录**：默认共享根改为 `StarTools.get_data_dir("astrbot_plugin_astral")`，即 `<data>/plugin_data/astrbot_plugin_astral`；相对 `shared_root` 与 `forbidden_roots` 的相对基准同步改为该目录。
+- **安全护栏**：`data/plugin_data` 仍禁止作为共享根，但放行本插件自己的数据目录（及其子目录）；其他插件数据目录继续拒绝。
+- **兼容与迁移**：旧默认位置 `<data>/workspaces/astral` 不自动迁移；README 增加手工迁移、官方备份与卸载数据说明。
+- **测试与文档**：新增 `tests/test_review_contract.py` 固化“只用 `astrbot.api.logger`、默认数据目录走 `StarTools.get_data_dir`”两条审核规则；`tests/test_config.py` / `tests/test_config_regression.py` 覆盖新默认路径与 plugin_data 放行/拒绝；恢复 README 被删掉的“它不能干什么”限制表，修复 `tests/test_views_contract.py` 缺失披露导致的失败。
+
 ### 记忆版本控制
 
 - **本地版本历史**：插件加载时在共享根初始化 `<共享根>/.git`（仅当 `version_control.enabled` 开启且找到系统 Git）。`.git/info/exclude` 只放行 `SOUL.md`、`MEMORY.md`、`AGENTS.md`、`EXTRA_PROMPT.md` 四份内容文件，其余内容全部排除；首启自动创建「初始快照」基线提交，之后不会在每次写记忆时自动提交。
@@ -12,7 +20,7 @@
 - **回退后生效**：回退成功清空快照缓存，下一轮对话直接使用回退后的记忆。
 - **配置**：新增 `version_control.enabled`（默认 `true`）与 `version_control.git_path`（默认空，自动查找 Git）；关闭后不再建仓、不提交，已有 `.git` 保留但不再使用。
 - **依赖与安全边界**：不新增 Python 依赖，仍只用标准库；Git 通过 `subprocess` 调用，无 shell、固定 `-c` 配置、固定身份 `Astral <astral@localhost>`、`GIT_TERMINAL_PROMPT=0`，只操作本地仓库，不 push、不联网。
-- **测试**：新增 `tests/test_versioning.py`（需要真实 `git`，缺失时整组跳过）；`tests/test_config.py` 覆盖 `version_control` 归一化，`tests/test_views_contract.py` 覆盖 README 的版本控制契约。全量 `pytest tests -q`：202 passed / 3 skipped。
+- **测试**：新增 `tests/test_versioning.py`（需要真实 `git`，缺失时整组跳过）；`tests/test_config.py` 覆盖 `version_control` 归一化，`tests/test_views_contract.py` 覆盖 README 的版本控制契约。全量 `pytest tests -q`：212 passed / 3 skipped。
 
 ### 兼容范围
 

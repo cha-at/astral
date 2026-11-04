@@ -1,21 +1,20 @@
 """Filesystem helpers for Astral metadata, audit, quota and archive.
 
 Covers 001 FR-11 (audit / archive / quota) and the '.astral/' self metadata
-from FR-8. The module is pure standard library so it can be unit tested
-without an AstrBot runtime.
+from FR-8. The module has no third-party dependencies; log records go through
+AstrBot's logger so plugin log levels apply.
 """
 
 from __future__ import annotations
 
 import json
-import logging
 import os
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger("astrbot")
+from astrbot.api import logger
 
 ASTRAL_DIR = ".astral"
 STATE_FILE = "state.json"

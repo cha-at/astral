@@ -300,6 +300,22 @@ def test_state_endpoint_200_and_503(plugin_factory):
     assert payload["message"] == payload["reason"]
 
 
+def test_default_config_installs_into_plugin_data(tmp_path, monkeypatch):
+    """An empty config must land in <data>/plugin_data/<plugin>."""
+    monkeypatch.setenv("ASTRBOT_ROOT", str(tmp_path / "root"))
+    data = tmp_path / "root" / "data"
+    import main as main_mod
+
+    plugin = main_mod.AstralPlugin(FakeContext(), {})
+    try:
+        expected = (data / "plugin_data" / config.PLUGIN_NAME).resolve()
+        assert plugin.is_installed() is True
+        assert plugin.shared_root() == expected
+        assert (expected / ".astral" / "state.json").is_file()
+    finally:
+        asyncio.run(plugin.terminate())
+
+
 def test_invalid_config_fails_loud_without_partial_patch(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTRBOT_ROOT", str(tmp_path / "root"))
     data = tmp_path / "root" / "data"
