@@ -7,7 +7,7 @@ desc: |
   还能用 /astral commit 存档、/astral recover 回退。
   开发版本为 4.29.4，其它版本还未实机测试。
 short_desc: 让 Bot 记住群里的人和事：所有群共用一份记忆，说话像同一个人
-version: 1.0.0
+version: 1.0.1
 author: ChakerAt
 repo: https://github.com/cha-at/astral
 astrbot_version: ">=4.27.0,<5"
